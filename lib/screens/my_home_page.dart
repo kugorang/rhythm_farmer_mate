@@ -8,10 +8,10 @@ import '../models/song.dart'; // 상대 경로 또는 package:rhythm_farmer_mate
 import '../models/song_category.dart'; // SongCategoryType enum import 추가
 import '../widgets/home_content_widget.dart'; // 새로 추가된 위젯
 import 'package:rhythm_farmer_mate/my_app.dart'; // themeModeNotifier 접근을 위해 추가 (또는 별도 파일로 분리)
-import '../widgets/metronome_settings_dialog_widget.dart'; // 새로 추가된 위젯
+// import '../widgets/metronome_settings_dialog_widget.dart'; // 삭제
 import '../services/audio_service.dart'; // AudioService 추가
-import '../services/bpm_service.dart';
-import '../services/challenge_service.dart';
+// import '../services/bpm_service.dart'; // 삭제
+// import '../services/challenge_service.dart'; // 삭제됨
 import '../widgets/pomodoro_control_button_widget.dart'
     show PomodoroState, PomodoroControlButtonWidget; // PomodoroState 임포트 확인
 import '../widgets/playlist_dialog_widget.dart'; // 새로 추가된 위젯
@@ -91,36 +91,37 @@ class _MyHomePageState extends State<MyHomePage> {
 
   bool get _isYoutubeMode => _currentSelectedSong.youtubeVideoId != null;
 
+  List<int> _playedShuffleIndices = []; // 셔플 모드에서 이미 재생된 곡들의 인덱스 저장
+
   @override
   void initState() {
     super.initState();
     _playMode = widget.initialPlayMode;
-    // songList가 null이거나 비어있으면 selectedSong만 포함하는 리스트로 초기화
     _currentPlaylist =
         (widget.songList != null && widget.songList!.isNotEmpty)
             ? List.from(widget.songList!)
             : [widget.selectedSong];
 
     if (_currentPlaylist.isEmpty) {
-      // 이 경우는 selectedSong도 없다는 의미이므로, 이전 화면으로 이동 등의 예외 처리
       if (mounted) Navigator.of(context).pop();
       return;
     }
 
-    if (_playMode == PlayMode.shuffle) {
+    if (_playMode == PlayMode.shuffle && _currentPlaylist.isNotEmpty) {
+      _playedShuffleIndices.clear(); // 셔플 모드 시작 시 재생 기록 초기화
       _currentSongIndex = _random.nextInt(_currentPlaylist.length);
+      _playedShuffleIndices.add(_currentSongIndex); // 첫 곡도 재생 기록에 추가
     } else {
       _currentSongIndex = _currentPlaylist.indexOf(widget.selectedSong);
       if (_currentSongIndex == -1) {
-        // selectedSong이 songList에 없는 예외적인 경우
-        _currentSelectedSong = widget.selectedSong; // 직접 할당
-        _currentPlaylist = [widget.selectedSong]; // 플레이리스트도 현재 곡 하나로 강제
+        _currentSelectedSong = widget.selectedSong;
+        _currentPlaylist = [widget.selectedSong];
         _currentSongIndex = 0;
-      } else {
-        _currentSelectedSong = _currentPlaylist[_currentSongIndex];
       }
     }
-    // _currentSelectedSong = _currentPlaylist[_currentSongIndex]; // 위에서 이미 할당됨
+    if (_currentPlaylist.isNotEmpty) {
+      _currentSelectedSong = _currentPlaylist[_currentSongIndex];
+    }
 
     _currentManualBpm =
         _currentSelectedSong.bpm > 0 ? _currentSelectedSong.bpm : 90;
@@ -486,28 +487,31 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     if (_playMode == PlayMode.normal) {
-      // 일반 모드에서는 현재 곡이 마지막 곡이거나 유일한 곡이면 재생 중지
       if (_currentPlaylist.length <= 1 ||
           _currentSongIndex >= _currentPlaylist.length - 1) {
         if (_isYoutubeMode && _youtubeController != null && _isYoutubePlaying)
           _youtubeController!.pauseVideo();
         else if (!_isYoutubeMode && _audioService.isPlaying)
           _audioService.pause();
-        // 필요하다면 _pomodoroState를 PomodoroState.stopped로 변경하는 로직 추가
         return;
       }
-      // 마지막 곡이 아니면 다음 곡으로
       _currentSongIndex = (_currentSongIndex + 1) % _currentPlaylist.length;
     } else if (_playMode == PlayMode.allSongs) {
       _currentSongIndex = (_currentSongIndex + 1) % _currentPlaylist.length;
     } else if (_playMode == PlayMode.shuffle) {
       if (_currentPlaylist.length > 1) {
-        int previousIndex = _currentSongIndex;
+        if (_playedShuffleIndices.length >= _currentPlaylist.length) {
+          _playedShuffleIndices.clear(); // 모든 곡을 한 번씩 다 재생했으면 기록 초기화
+        }
+        int nextIndex;
         do {
-          _currentSongIndex = _random.nextInt(_currentPlaylist.length);
-        } while (_currentSongIndex == previousIndex);
+          nextIndex = _random.nextInt(_currentPlaylist.length);
+        } while (_playedShuffleIndices.contains(nextIndex)); // 아직 재생 안 된 곡 선택
+        _currentSongIndex = nextIndex;
+        _playedShuffleIndices.add(_currentSongIndex); // 재생 기록에 추가
       } else {
-        _currentSongIndex = 0;
+        _currentSongIndex = 0; // 곡이 하나면 그냥 그 곡 (또는 재생 중지)
+        if (_playedShuffleIndices.isEmpty) _playedShuffleIndices.add(0);
       }
     }
 
@@ -741,6 +745,18 @@ class _MyHomePageState extends State<MyHomePage> {
   void _changePlayMode(PlayMode mode) {
     setState(() {
       _playMode = mode;
+      if (mode == PlayMode.shuffle) {
+        _playedShuffleIndices.clear(); // 셔플 모드로 변경 시 재생 기록 초기화
+        if (_currentPlaylist.isNotEmpty) {
+          // 현재 재생 중인 곡은 유지하고, 다음 곡부터 셔플 적용 또는 즉시 다른 곡 셔플
+          // 여기서는 다음 곡부터 적용되도록 _playedShuffleIndices만 초기화
+          // 만약 현재 곡도 셔플 대상에 포함시키고 싶다면, 여기서 _playNextSong() 호출 고려
+          // 현재 곡을 playedIndices에 먼저 추가
+          if (!_playedShuffleIndices.contains(_currentSongIndex)) {
+            _playedShuffleIndices.add(_currentSongIndex);
+          }
+        }
+      }
     });
     if (!_isYoutubeMode) {
       _audioService.setLoopMode(
