@@ -153,10 +153,14 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     // Song(filePath: 'assets/audio/tick.mp3', title: '메트로놈 틱', bpm: 0, categoryType: SongCategoryType.modernLaborSong), // 메트로놈 삭제로 제거
   ];
 
+  // 내부 변수에 플레이리스트 관련 추가
+  final List<Song> _playlistSongs = []; // 현재 재생 목록에 추가된 노래들
+
   @override
   void initState() {
     super.initState();
     _loadSongs();
+    _loadPlaylist(); // 플레이리스트 로드
   }
 
   Future<void> _loadSongs() async {
@@ -166,6 +170,17 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         _userRegisteredSongs = userSongs;
         _fullSongList = [..._baseSongList, ..._userRegisteredSongs];
         // _songPlayModes 초기화 로직 삭제
+      });
+    }
+  }
+
+  Future<void> _loadPlaylist() async {
+    // 플레이리스트는 사용자의 선호도를 반영하는 것이므로 UserSongService를 활용
+    final playlistSongs = await _userSongService.getPlaylistSongs();
+    if (mounted) {
+      setState(() {
+        _playlistSongs.clear();
+        _playlistSongs.addAll(playlistSongs);
       });
     }
   }
@@ -266,21 +281,116 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
   }
 
   Future<void> _addYoutubeSong(String videoId, String originalUrl) async {
-    final int userBpm =
-        await _showBpmInputDialog() ?? 120; // BPM 입력 받기 (기본값 120)
-    final title = await _fetchYoutubeTitle(videoId) ?? 'YouTube - $videoId';
-    final newSong = Song(
-      youtubeVideoId: videoId,
-      title: title,
-      bpm: userBpm,
-      categoryType: SongCategoryType.userRegistered,
-    );
-    await _userSongService.addUserSong(newSong);
-    await _loadSongs();
-    if (mounted)
-      ShadToaster.of(
-        context,
-      ).show(ShadToast(description: Text('${newSong.title} 추가됨')));
+    try {
+      // 기본 제목을 가져오기 (자동 가져오기가 안되면 videoId로 표시)
+      String defaultTitle =
+          await _fetchYoutubeTitle(videoId) ?? 'YouTube - $videoId';
+
+      // 제목/BPM 입력을 위한 컨트롤러
+      final titleController = TextEditingController(text: defaultTitle);
+      final bpmController = TextEditingController(text: '120');
+
+      // 사용자에게 제목과 BPM 입력 받기
+      final result = await showShadDialog<Map<String, dynamic>?>(
+        context: context,
+        builder: (context) {
+          return ShadDialog(
+            title: const Text('유튜브 노래 정보 입력'),
+            description: const Text('노래 제목과 BPM을 입력해주세요.'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('노래 제목'),
+                const SizedBox(height: 4),
+                ShadInput(
+                  controller: titleController,
+                  placeholder: const Text('노래 제목 입력'),
+                ),
+                const SizedBox(height: 12),
+                const Text('BPM 값 (숫자만)'),
+                const SizedBox(height: 4),
+                ShadInput(
+                  controller: bpmController,
+                  keyboardType: TextInputType.number,
+                  placeholder: const Text('예: 120'),
+                ),
+              ],
+            ),
+            actions: [
+              ShadButton.ghost(
+                child: const Text('취소'),
+                onPressed: () => Navigator.of(context).pop(null),
+              ),
+              ShadButton(
+                child: const Text('저장'),
+                onPressed: () {
+                  final title =
+                      titleController.text.isNotEmpty
+                          ? titleController.text
+                          : defaultTitle;
+
+                  final bpm = int.tryParse(bpmController.text) ?? 120;
+
+                  Navigator.of(context).pop({'title': title, 'bpm': bpm});
+                },
+              ),
+            ],
+          );
+        },
+      );
+
+      // 다이얼로그 취소 시 종료
+      if (result == null) return;
+
+      // 새 노래 객체 생성 및 저장
+      final newSong = Song(
+        youtubeVideoId: videoId,
+        title: result['title'] as String,
+        bpm: result['bpm'] as int,
+        categoryType: SongCategoryType.userRegistered,
+      );
+
+      print('유튜브 노래 저장 시도: ${newSong.title} (ID: $videoId)');
+
+      // 먼저 목록에 이미 같은 ID의 노래가 있는지 확인
+      final existingSongs =
+          _userRegisteredSongs
+              .where((s) => s.youtubeVideoId == videoId)
+              .toList();
+
+      if (existingSongs.isNotEmpty) {
+        if (mounted) {
+          ShadToaster.of(context).show(
+            ShadToast(
+              description: Text(
+                '이미 등록된 유튜브 영상입니다: ${existingSongs.first.title}',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      await _userSongService.addUserSong(newSong);
+      print('유튜브 노래 저장 성공: ${newSong.title}');
+      await _loadSongs();
+
+      if (mounted) {
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: Text('${newSong.title} 추가됨')));
+      }
+    } catch (e) {
+      print('유튜브 노래 추가 오류: ${e.toString()}');
+      if (mounted) {
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('유튜브 노래를 추가하는 중 오류가 발생했습니다.\n다시 시도해주세요.'),
+          ),
+        );
+      }
+    }
   }
 
   // 간단한 YouTube 제목 가져오기 예시 (실제로는 http 패키지 등 사용 및 오류 처리 필요)
@@ -376,85 +486,112 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     );
   }
 
-  // 사용자 등록 곡 관리 다이얼로그
+  // 사용자 등록 곡 관리 다이얼로그 수정: BPM과 제목 수정 기능 추가
   Future<void> _showUserSongManagementDialog() async {
-    // _loadSongs를 호출하여 최신 사용자 곡 목록을 가져올 수 있지만, 현재 _userRegisteredSongs 사용
-    // await _loadSongs(); // 필요시 호출
     return showShadDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
-          // 다이얼로그 내부에서 setState를 사용하기 위해
           builder: (context, setDialogState) {
             return ShadDialog(
               title: const Text('내가 등록한 노동요 관리'),
               description: Text('총 ${_userRegisteredSongs.length}곡'),
               child: SizedBox(
                 width: double.maxFinite,
-                height: MediaQuery.of(context).size.height * 0.5, // 높이 조절
-                child:
-                    _userRegisteredSongs.isEmpty
-                        ? const Center(child: Text('등록된 노래가 없습니다.'))
-                        : ListView.builder(
-                          itemCount: _userRegisteredSongs.length,
-                          itemBuilder: (ctx, index) {
-                            final song = _userRegisteredSongs[index];
-                            return ListTile(
-                              title: Text(song.title),
-                              subtitle: Text(
-                                song.filePath ?? song.youtubeVideoId ?? '정보 없음',
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.redAccent,
+                height: MediaQuery.of(context).size.height * 0.5,
+                child: Material(
+                  color: Colors.transparent,
+                  child:
+                      _userRegisteredSongs.isEmpty
+                          ? const Center(child: Text('등록된 노래가 없습니다.'))
+                          : ListView.builder(
+                            itemCount: _userRegisteredSongs.length,
+                            itemBuilder: (ctx, index) {
+                              final song = _userRegisteredSongs[index];
+                              return ListTile(
+                                title: Text(song.title),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('BPM: ${song.bpm}'),
+                                    if (song.youtubeVideoId != null)
+                                      Text('YouTube ID: ${song.youtubeVideoId}')
+                                    else if (song.filePath != null)
+                                      Text('파일: ${song.filePath}'),
+                                  ],
                                 ),
-                                tooltip: '삭제',
-                                onPressed: () async {
-                                  bool? confirmed = await showShadDialog<bool>(
-                                    context: context,
-                                    builder:
-                                        (context) => ShadDialog(
-                                          title: const Text('삭제 확인'),
-                                          description: Text(
-                                            '\'${song.title}\' 노래를 삭제하시겠습니까?',
-                                          ),
-                                          actions: [
-                                            ShadButton.ghost(
-                                              child: const Text('취소'),
-                                              onPressed:
-                                                  () => Navigator.of(
-                                                    context,
-                                                  ).pop(false),
-                                            ),
-                                            ShadButton.destructive(
-                                              child: const Text('삭제'),
-                                              onPressed:
-                                                  () => Navigator.of(
-                                                    context,
-                                                  ).pop(true),
-                                            ),
-                                          ],
-                                        ),
-                                  );
-                                  if (confirmed == true) {
-                                    await _userSongService.deleteUserSong(song);
-                                    await _loadSongs(); // 전체 목록 및 현재 화면 다시 로드
-                                    setDialogState(() {}); // 다이얼로그 내부 UI 갱신
-                                    if (mounted)
-                                      ShadToaster.of(context).show(
-                                        ShadToast(
-                                          description: Text(
-                                            '${song.title} 삭제됨',
-                                          ),
-                                        ),
-                                      );
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                        ),
+                                isThreeLine: true,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        color: Colors.blueAccent,
+                                      ),
+                                      tooltip: '수정',
+                                      onPressed: () async {
+                                        await _showEditSongDialog(song);
+                                        setDialogState(() {}); // 다이얼로그 내부 UI 갱신
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.redAccent,
+                                      ),
+                                      tooltip: '삭제',
+                                      onPressed: () async {
+                                        bool?
+                                        confirmed = await showShadDialog<bool>(
+                                          context: context,
+                                          builder:
+                                              (context) => ShadDialog(
+                                                title: const Text('삭제 확인'),
+                                                description: Text(
+                                                  '\'${song.title}\' 노래를 삭제하시겠습니까?',
+                                                ),
+                                                actions: [
+                                                  ShadButton.ghost(
+                                                    child: const Text('취소'),
+                                                    onPressed:
+                                                        () => Navigator.of(
+                                                          context,
+                                                        ).pop(false),
+                                                  ),
+                                                  ShadButton.destructive(
+                                                    child: const Text('삭제'),
+                                                    onPressed:
+                                                        () => Navigator.of(
+                                                          context,
+                                                        ).pop(true),
+                                                  ),
+                                                ],
+                                              ),
+                                        );
+                                        if (confirmed == true) {
+                                          await _userSongService.deleteUserSong(
+                                            song,
+                                          );
+                                          await _loadSongs();
+                                          setDialogState(() {});
+                                          if (mounted)
+                                            ShadToaster.of(context).show(
+                                              ShadToast(
+                                                description: Text(
+                                                  '${song.title} 삭제됨',
+                                                ),
+                                              ),
+                                            );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                ),
               ),
               actions: [
                 ShadButton(
@@ -467,6 +604,247 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         );
       },
     );
+  }
+
+  // 노래 정보 수정 다이얼로그
+  Future<void> _showEditSongDialog(Song song) async {
+    final titleController = TextEditingController(text: song.title);
+    final bpmController = TextEditingController(text: song.bpm.toString());
+
+    final result = await showShadDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (context) {
+        return ShadDialog(
+          title: const Text('노래 정보 수정'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('노래 제목'),
+              const SizedBox(height: 4),
+              ShadInput(
+                controller: titleController,
+                placeholder: const Text('노래 제목 입력'),
+              ),
+              const SizedBox(height: 12),
+              const Text('BPM 값 (숫자만)'),
+              const SizedBox(height: 4),
+              ShadInput(
+                controller: bpmController,
+                keyboardType: TextInputType.number,
+                placeholder: const Text('예: 120'),
+              ),
+            ],
+          ),
+          actions: [
+            ShadButton.ghost(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(context).pop(null),
+            ),
+            ShadButton(
+              child: const Text('저장'),
+              onPressed: () {
+                final title =
+                    titleController.text.isNotEmpty
+                        ? titleController.text
+                        : song.title;
+
+                final bpm = int.tryParse(bpmController.text) ?? song.bpm;
+
+                Navigator.of(context).pop({'title': title, 'bpm': bpm});
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) return;
+
+    // 기존 노래 정보를 업데이트한 새 노래 객체 생성
+    final updatedSong = Song(
+      filePath: song.filePath,
+      youtubeVideoId: song.youtubeVideoId,
+      title: result['title'] as String,
+      bpm: result['bpm'] as int,
+      categoryType: song.categoryType,
+      subCategory: song.subCategory,
+    );
+
+    // 기존 노래를 업데이트된 노래로 대체
+    await _userSongService.updateUserSong(song, updatedSong);
+    await _loadSongs();
+
+    if (mounted) {
+      ShadToaster.of(
+        context,
+      ).show(ShadToast(description: Text('${updatedSong.title} 정보가 수정되었습니다.')));
+    }
+  }
+
+  // 재생목록 관리 화면 표시
+  Future<void> _showPlaylistManagementDialog() async {
+    return showShadDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return ShadDialog(
+              title: const Text('재생 목록 관리'),
+              description: Text('총 ${_playlistSongs.length}곡'),
+              child: SizedBox(
+                width: double.maxFinite,
+                height: MediaQuery.of(context).size.height * 0.5,
+                child: Material(
+                  color: Colors.transparent,
+                  child:
+                      _playlistSongs.isEmpty
+                          ? const Center(
+                            child: Text('재생 목록이 비어있습니다.\n노래 목록에서 추가해주세요.'),
+                          )
+                          : ReorderableListView.builder(
+                            itemCount: _playlistSongs.length,
+                            onReorder: (oldIndex, newIndex) async {
+                              if (oldIndex < newIndex) {
+                                newIndex -= 1;
+                              }
+                              final song = _playlistSongs.removeAt(oldIndex);
+                              _playlistSongs.insert(newIndex, song);
+
+                              await _userSongService.savePlaylistSongs(
+                                _playlistSongs,
+                              );
+                              setDialogState(() {});
+                            },
+                            itemBuilder: (ctx, index) {
+                              final song = _playlistSongs[index];
+                              return ListTile(
+                                key: ValueKey(
+                                  song.title +
+                                      (song.youtubeVideoId ??
+                                          song.filePath ??
+                                          ''),
+                                ),
+                                title: Text(song.title),
+                                subtitle: Text('BPM: ${song.bpm}'),
+                                leading: Icon(
+                                  song.youtubeVideoId != null
+                                      ? Icons.smart_display_rounded
+                                      : Icons.music_note_rounded,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Colors.redAccent,
+                                  ),
+                                  tooltip: '재생 목록에서 제거',
+                                  onPressed: () async {
+                                    _playlistSongs.removeAt(index);
+                                    await _userSongService.savePlaylistSongs(
+                                      _playlistSongs,
+                                    );
+                                    setDialogState(() {});
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                ),
+              ),
+              actions: [
+                ShadButton.ghost(
+                  child: const Text('목록 비우기'),
+                  onPressed: () async {
+                    bool? confirmed = await showShadDialog<bool>(
+                      context: context,
+                      builder:
+                          (context) => ShadDialog(
+                            title: const Text('재생 목록 비우기'),
+                            description: const Text('재생 목록을 모두 비우시겠습니까?'),
+                            actions: [
+                              ShadButton.ghost(
+                                child: const Text('취소'),
+                                onPressed:
+                                    () => Navigator.of(context).pop(false),
+                              ),
+                              ShadButton.destructive(
+                                child: const Text('비우기'),
+                                onPressed:
+                                    () => Navigator.of(context).pop(true),
+                              ),
+                            ],
+                          ),
+                    );
+
+                    if (confirmed == true) {
+                      _playlistSongs.clear();
+                      await _userSongService.savePlaylistSongs(_playlistSongs);
+                      setDialogState(() {});
+                    }
+                  },
+                ),
+                ShadButton(
+                  child: const Text('닫기'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ShadButton(
+                  child: const Text('전체 재생'),
+                  onPressed: () {
+                    if (_playlistSongs.isEmpty) {
+                      ShadToaster.of(context).show(
+                        const ShadToast(description: Text('재생 목록이 비어있습니다.')),
+                      );
+                      return;
+                    }
+
+                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => MyHomePage(
+                              selectedSong: _playlistSongs.first,
+                              songList: _playlistSongs,
+                              initialPlayMode: PlayMode.allSongs,
+                            ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 플레이리스트에 노래 추가
+  Future<void> _addToPlaylist(Song song) async {
+    // 중복 체크
+    if (_playlistSongs.any(
+      (s) =>
+          (s.filePath != null && s.filePath == song.filePath) ||
+          (s.youtubeVideoId != null && s.youtubeVideoId == song.youtubeVideoId),
+    )) {
+      if (mounted) {
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: Text('이미 재생 목록에 추가된 노래입니다.')));
+      }
+      return;
+    }
+
+    // 플레이리스트에 노래 추가 및 저장
+    await _userSongService.addToPlaylist(song);
+    await _loadPlaylist(); // 업데이트된 플레이리스트 로드
+
+    if (mounted) {
+      ShadToaster.of(
+        context,
+      ).show(ShadToast(description: Text('${song.title} 재생 목록에 추가됨')));
+    }
   }
 
   @override
@@ -501,6 +879,14 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         ),
         backgroundColor: theme.colorScheme.primary,
         actions: [
+          // 재생 목록 보기 버튼 추가
+          Tooltip(
+            message: '재생 목록 관리',
+            child: ShadButton.ghost(
+              icon: const Icon(Icons.queue_music, color: Colors.white),
+              onPressed: _showPlaylistManagementDialog,
+            ),
+          ),
           Tooltip(
             message: '내가 등록한 노동요 관리',
             child: ShadButton.ghost(
@@ -541,37 +927,52 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
               runSpacing: 12.0,
               alignment: WrapAlignment.center,
               children: [
-                ShadButton(
-                  size: ShadButtonSize.sm,
-                  variant:
-                      _selectedCategoryType == null
-                          ? ShadButtonVariant.primary
-                          : ShadButtonVariant.outline,
-                  onPressed: () {
-                    setState(() {
-                      _selectedCategoryType = null;
-                    });
-                  },
-                  child: const Text('전체', style: TextStyle(fontSize: 14)),
-                ),
+                _selectedCategoryType == null
+                    ? ShadButton(
+                      size: ShadButtonSize.sm,
+                      onPressed: () {
+                        setState(() {
+                          _selectedCategoryType = null;
+                        });
+                      },
+                      child: const Text('전체', style: TextStyle(fontSize: 14)),
+                    )
+                    : ShadButton.outline(
+                      size: ShadButtonSize.sm,
+                      onPressed: () {
+                        setState(() {
+                          _selectedCategoryType = null;
+                        });
+                      },
+                      child: const Text('전체', style: TextStyle(fontSize: 14)),
+                    ),
                 ...categories.map((category) {
                   final isSelected = _selectedCategoryType == category.type;
-                  return ShadButton(
-                    size: ShadButtonSize.sm,
-                    variant:
-                        isSelected
-                            ? ShadButtonVariant.primary
-                            : ShadButtonVariant.outline,
-                    onPressed: () {
-                      setState(() {
-                        _selectedCategoryType = category.type;
-                      });
-                    },
-                    child: Text(
-                      category.title,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  );
+                  return isSelected
+                      ? ShadButton(
+                        size: ShadButtonSize.sm,
+                        onPressed: () {
+                          setState(() {
+                            _selectedCategoryType = category.type;
+                          });
+                        },
+                        child: Text(
+                          category.title,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      )
+                      : ShadButton.outline(
+                        size: ShadButtonSize.sm,
+                        onPressed: () {
+                          setState(() {
+                            _selectedCategoryType = category.type;
+                          });
+                        },
+                        child: Text(
+                          category.title,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      );
                 }).toList(),
               ],
             ),
@@ -601,7 +1002,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                       itemCount: displayedSongs.length,
                       itemBuilder: (context, index) {
                         final song = displayedSongs[index];
-                        // PlayMode currentSongPlayMode = _songPlayModes[song.title] ?? _defaultPlayMode; // 재생 모드 선택 UI 제거
                         return Card(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -626,26 +1026,46 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                                 fontSize: 17,
                               ),
                             ),
-                            // subtitle: Text('BPM: ${song.bpm}', style: theme.textTheme.small), // BPM 표시 제거
-                            trailing: IconButton(
-                              icon: const Icon(
-                                Icons.play_circle_fill_rounded,
-                                size: 32,
-                              ),
-                              color: theme.colorScheme.primary,
-                              tooltip: '이 노래 재생하기',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => MyHomePage(
-                                          selectedSong: song,
-                                          // initialPlayMode는 MyHomePage에서 기본값(normal) 사용 또는 재생 화면에서 선택
-                                        ),
+                            subtitle: Text(
+                              'BPM: ${song.bpm}',
+                              style: theme.textTheme.small,
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // 재생 목록에 추가 버튼
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.playlist_add,
+                                    color: theme.colorScheme.primary,
+                                    size: 28,
                                   ),
-                                );
-                              },
+                                  tooltip: '재생 목록에 추가',
+                                  onPressed: () => _addToPlaylist(song),
+                                ),
+                                // 재생 버튼
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.play_circle_fill_rounded,
+                                    color: theme.colorScheme.primary,
+                                    size: 32,
+                                  ),
+                                  tooltip: '이 노래 재생하기',
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) => MyHomePage(
+                                              selectedSong: song,
+                                              songList: [song],
+                                              initialPlayMode: PlayMode.normal,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                         );

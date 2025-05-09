@@ -162,30 +162,10 @@ class _MyHomePageState extends State<MyHomePage> {
     await _youtubeController!.loadVideoById(
       videoId: _currentSelectedSong.youtubeVideoId!,
     );
-    // listen을 사용하여 metadata 변경 감지
-    _youtubeController!.listen((value) {
-      if (mounted &&
-          value.metaData.duration.inSeconds > 0 &&
-          _youtubeDuration != value.metaData.duration) {
-        _youtubeDuration = value.metaData.duration;
-        if (_pomodoroState == PomodoroState.stopped) {
-          _remainingTime = _youtubeDuration;
-          _updateTimerText();
-          _updateProgress();
-        }
-        if (_isLoadingSong) setState(() => _isLoadingSong = false);
-      }
-      // 플레이어 오류 상태 처리 (unknown으로만 감지 시도)
-      if (value.playerState == PlayerState.unknown) {
-        if (mounted && _isLoadingSong) setState(() => _isLoadingSong = false);
-        if (_pomodoroState == PomodoroState.stopped) {
-          _remainingTime = _workDuration;
-          _updateTimerText();
-          _updateProgress();
-        }
-        print("YouTube Player Unknown State (potential error)");
-      }
-    });
+
+    // listen을 사용하여 YouTube 이벤트 처리
+    _youtubeController!.listen(_handleYoutubeStateChanged);
+
     // 만약 listen으로 즉시 duration을 못가져오는 경우 대비, 짧은 시간 후 강제 로딩 해제
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted && _isLoadingSong) {
@@ -198,6 +178,94 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     });
+  }
+
+  // YouTube 플레이어 이벤트 처리 메서드
+  void _handleYoutubeStateChanged(YoutubePlayerValue value) {
+    if (!mounted) return;
+
+    bool shouldSetState = false;
+
+    // 재생 상태 변경 감지
+    if (_isYoutubePlaying != (value.playerState == PlayerState.playing)) {
+      _isYoutubePlaying = value.playerState == PlayerState.playing;
+      shouldSetState = true;
+    }
+
+    // 영상 길이 초기화 및 변경 감지
+    if (value.metaData.duration.inSeconds > 0 &&
+        _youtubeDuration != value.metaData.duration) {
+      _youtubeDuration = value.metaData.duration;
+      if (_pomodoroState == PomodoroState.stopped) {
+        // 현재 포모도로 상태가 정지 상태일 때만 남은 시간을 업데이트
+        _youtubeController!.currentTime.then((currentSeconds) {
+          final position = Duration(
+            milliseconds: (currentSeconds * 1000).round(),
+          );
+          _remainingTime = _youtubeDuration - position;
+          if (_remainingTime.isNegative) _remainingTime = Duration.zero;
+          _updateTimerText();
+          _updateProgress();
+        });
+      }
+
+      if (_isLoadingSong) {
+        setState(() => _isLoadingSong = false);
+      }
+
+      shouldSetState = true;
+    }
+
+    // 타이머가 정지 상태이고 재생 중일 때 시간 업데이트
+    if (_pomodoroState == PomodoroState.stopped &&
+        _youtubeDuration.inSeconds > 0 &&
+        value.playerState == PlayerState.playing) {
+      _youtubeController!.currentTime.then((currentSeconds) {
+        final position = Duration(
+          milliseconds: (currentSeconds * 1000).round(),
+        );
+        final newRemainingTime = _youtubeDuration - position;
+        if (_remainingTime != newRemainingTime &&
+            !newRemainingTime.isNegative) {
+          _remainingTime = newRemainingTime;
+          _updateTimerText();
+          if (shouldSetState) {
+            _updateProgress();
+          }
+        }
+      });
+    }
+
+    // 플레이어 상태 변경 시 화면 갱신
+    if (shouldSetState) {
+      setState(() {
+        _updateProgress();
+      });
+    }
+
+    // 재생 종료 시 반복 재생 처리
+    if (value.playerState == PlayerState.ended &&
+        _pomodoroState == PomodoroState.stopped) {
+      if (_playMode == PlayMode.repeat) {
+        _youtubeController?.seekTo(seconds: 0);
+        _youtubeController?.playVideo();
+      } else {
+        _handleYouTubeVideoEnded();
+      }
+    }
+
+    // 플레이어 오류 상태 처리
+    if (value.playerState == PlayerState.unknown) {
+      if (mounted && _isLoadingSong) {
+        setState(() => _isLoadingSong = false);
+      }
+      if (_pomodoroState == PomodoroState.stopped) {
+        _remainingTime = _workDuration;
+        _updateTimerText();
+        _updateProgress();
+      }
+      print("YouTube Player Unknown State (potential error)");
+    }
   }
 
   void _setupAudioServiceCallbacks() {
@@ -291,58 +359,6 @@ class _MyHomePageState extends State<MyHomePage> {
       bpmTextColor = theme.colorScheme.foreground;
     }
 
-    Widget playerWidget = const SizedBox.shrink();
-    if (_isYoutubeMode && _youtubeController != null) {
-      playerWidget = YouTubePlayerWidget(
-        controller: _youtubeController!,
-        timerText: _timerText,
-        progressPercent: _progressPercent,
-        isChallengeRunning: _pomodoroState != PomodoroState.stopped,
-        onChallengeButtonPressed: () {
-          if (_pomodoroState == PomodoroState.stopped)
-            _startNextPomodoroPhase();
-          else
-            _stopPomodoro();
-        },
-        onPlayerStateChanged: (state, position, duration) {
-          if (!mounted) return;
-          bool shouldSetState = false;
-          if (_isYoutubePlaying != (state == PlayerState.playing)) {
-            _isYoutubePlaying = state == PlayerState.playing;
-            shouldSetState = true;
-          }
-          if (duration.inSeconds > 0 && _youtubeDuration != duration) {
-            _youtubeDuration = duration;
-            if (_pomodoroState == PomodoroState.stopped) {
-              _remainingTime = duration - position;
-              if (_remainingTime.isNegative) _remainingTime = Duration.zero;
-              _updateTimerText();
-            }
-            shouldSetState = true;
-          }
-          if (_pomodoroState == PomodoroState.stopped &&
-              _youtubeDuration.inSeconds > 0) {
-            final newRemainingTime = _youtubeDuration - position;
-            if (_remainingTime != newRemainingTime &&
-                !newRemainingTime.isNegative) {
-              _remainingTime = newRemainingTime;
-              _updateTimerText();
-            }
-          }
-          if (shouldSetState)
-            setState(() {
-              _updateProgress();
-            });
-          if (state == PlayerState.ended &&
-              _pomodoroState == PomodoroState.stopped &&
-              _playMode == PlayMode.repeat) {
-            _youtubeController?.seekTo(seconds: 0);
-            _youtubeController?.playVideo();
-          }
-        },
-      );
-    }
-
     return Scaffold(
       appBar: AppBarWidget(
         title: _currentSelectedSong.title,
@@ -355,6 +371,8 @@ class _MyHomePageState extends State<MyHomePage> {
             builder: (context, constraints) {
               final horizontalPadding =
                   constraints.maxWidth < 600 ? 16.0 : 24.0;
+
+              // 통합된 단일 레이아웃 사용 (유튜브/일반 모드 구분 없음)
               return Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: horizontalPadding,
@@ -363,8 +381,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (_isYoutubeMode) Expanded(child: playerWidget),
-                    if (_isYoutubeMode) const SizedBox(height: 16),
                     Expanded(
                       child: HomeContentWidget(
                         isLoadingSong: _isLoadingSong,
@@ -396,14 +412,17 @@ class _MyHomePageState extends State<MyHomePage> {
                           else
                             _stopPomodoro();
                         },
-                        speedPresetSlow: 0,
-                        speedPresetNormal: 1,
-                        speedPresetFast: 2,
+                        speedPresetSlow: slowBpm,
+                        speedPresetNormal: normalBpm,
+                        speedPresetFast: fastBpm,
                         isYoutubeMode: _isYoutubeMode,
                         currentPomodoroState: _pomodoroState,
                         pomodoroCycleCount: _pomodoroCycleCount,
                         playMode: _playMode,
                         onPlayModeChanged: _changePlayMode,
+                        youtubeController: _youtubeController,
+                        onChangeToNextSong: _playNextSong,
+                        onChangeToPrevSong: _playPrevSong,
                       ),
                     ),
                   ],
@@ -413,6 +432,29 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showPlaylistDialog() {
+    showShadDialog(
+      context: context,
+      builder:
+          (dialogContext) => PlaylistDialogWidget(
+            songList: _currentPlaylist,
+            currentSelectedSong: _currentSelectedSong,
+            currentPlayMode: _playMode,
+            onSongSelected: (song) {
+              Navigator.of(dialogContext).pop();
+              int songIndex = _currentPlaylist.indexOf(song);
+              if (songIndex != -1) {
+                _changeToSongAtIndex(songIndex);
+              }
+            },
+            onOverallPlayModeChanged: (newMode) {
+              Navigator.of(dialogContext).pop();
+              _changePlayMode(newMode);
+            },
+          ),
     );
   }
 
@@ -514,6 +556,59 @@ class _MyHomePageState extends State<MyHomePage> {
       } else {
         _currentSongIndex = 0; // 곡이 하나면 그냥 그 곡 (또는 재생 중지)
         if (_playedShuffleIndices.isEmpty) _playedShuffleIndices.add(0);
+      }
+    }
+
+    _changeToSongAtIndex(_currentSongIndex);
+  }
+
+  // 이전 곡 재생 메서드
+  void _playPrevSong() {
+    if (_currentPlaylist.isEmpty) return;
+
+    if (_playMode == PlayMode.repeat) {
+      if (_isYoutubeMode && _youtubeController != null) {
+        _youtubeController!.seekTo(seconds: 0);
+        _youtubeController!.playVideo();
+      } else if (!_isYoutubeMode) {
+        _audioService.seek(Duration.zero);
+        _audioService.play();
+      }
+      return;
+    }
+
+    if (_playMode == PlayMode.normal) {
+      if (_currentPlaylist.length <= 1 || _currentSongIndex <= 0) {
+        if (_isYoutubeMode && _youtubeController != null && _isYoutubePlaying)
+          _youtubeController!.pauseVideo();
+        else if (!_isYoutubeMode && _audioService.isPlaying)
+          _audioService.pause();
+        return;
+      }
+      _currentSongIndex = (_currentSongIndex - 1);
+    } else if (_playMode == PlayMode.allSongs) {
+      _currentSongIndex =
+          (_currentSongIndex - 1 + _currentPlaylist.length) %
+          _currentPlaylist.length;
+    } else if (_playMode == PlayMode.shuffle) {
+      // 셔플 모드에서는 이전에 재생된 기록이 있으면 그 곡으로 이동
+      if (_playedShuffleIndices.length > 1) {
+        // 현재 인덱스를 제거하고 이전 인덱스로 이동
+        _playedShuffleIndices.removeLast();
+        _currentSongIndex = _playedShuffleIndices.last;
+      } else {
+        // 처음 곡이거나 기록이 부족할 경우 랜덤한 곡 선택
+        int prevIndex;
+        do {
+          prevIndex = _random.nextInt(_currentPlaylist.length);
+        } while (prevIndex == _currentSongIndex && _currentPlaylist.length > 1);
+        _currentSongIndex = prevIndex;
+        // 현재 인덱스가 있으면 유지, 없으면 새로 추가
+        if (_playedShuffleIndices.isEmpty) {
+          _playedShuffleIndices.add(_currentSongIndex);
+        } else {
+          _playedShuffleIndices[0] = _currentSongIndex;
+        }
       }
     }
 
@@ -720,30 +815,6 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void _showPlaylistDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => PlaylistDialogWidget(
-            songList: _currentPlaylist, // 현재 전체 재생 목록 전달
-            currentSelectedSong: _currentSelectedSong,
-            currentPlayMode: _playMode, // 현재 전체 재생 모드 전달
-            onSongSelected: (song) {
-              Navigator.of(context).pop();
-              int songIndex = _currentPlaylist.indexOf(song);
-              if (songIndex != -1) {
-                _changeToSongAtIndex(songIndex);
-              }
-            },
-            onOverallPlayModeChanged: (newMode) {
-              Navigator.of(context).pop();
-              // 전체 재생 모드 변경 로직 (MyHomePage의 _playMode 상태 업데이트)
-              _changePlayMode(newMode); // _changePlayMode는 내부적으로 setState 호출
-            },
-          ),
-    );
-  }
-
   void _changePlayMode(PlayMode mode) {
     setState(() {
       _playMode = mode;
@@ -831,130 +902,4 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-}
-
-class YouTubePlayerWidget extends StatelessWidget {
-  final YoutubePlayerController controller;
-  final String timerText;
-  final double progressPercent;
-  final bool isChallengeRunning;
-  final VoidCallback onChallengeButtonPressed;
-  final Function(PlayerState state, Duration position, Duration duration)?
-  onPlayerStateChanged;
-
-  const YouTubePlayerWidget({
-    Key? key,
-    required this.controller,
-    required this.timerText,
-    required this.progressPercent,
-    required this.isChallengeRunning,
-    required this.onChallengeButtonPressed,
-    this.onPlayerStateChanged,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final size = MediaQuery.of(context).size;
-    final maxWidth = size.width > 600 ? 600.0 : size.width;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: maxWidth,
-            maxHeight: maxWidth * 9 / 16,
-          ),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.colorScheme.border),
-                ),
-                child: YoutubePlayer(controller: controller),
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 16.0),
-          child: Text(timerText, style: theme.textTheme.h1),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: SizedBox(
-            width: maxWidth,
-            child: LinearProgressIndicator(
-              value: progressPercent,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4.0),
-            ),
-          ),
-        ),
-        SizedBox(width: maxWidth),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: SizedBox(
-            width: maxWidth,
-            child: buildPlayControls(theme, controller),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget buildPlayControls(
-    ShadThemeData theme,
-    YoutubePlayerController playerController,
-  ) {
-    return StreamBuilder<YoutubePlayerValue>(
-      stream: playerController.stream,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ShadButton.outline(
-                onPressed: () => playerController.seekTo(seconds: 0),
-                icon: const Icon(Icons.restart_alt),
-                child: const Text('처음으로'),
-              ),
-              const SizedBox(width: 16),
-              ShadButton.outline(
-                onPressed: () => playerController.playVideo(),
-                icon: const Icon(Icons.play_arrow),
-                child: const Text('재생'),
-              ),
-            ],
-          );
-        }
-        final value = snapshot.data!;
-        final isPlaying = value.playerState == PlayerState.playing;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ShadButton.outline(
-              onPressed: () => playerController.seekTo(seconds: 0),
-              icon: const Icon(Icons.restart_alt),
-              child: const Text('처음으로'),
-            ),
-            const SizedBox(width: 16),
-            ShadButton.outline(
-              onPressed: () {
-                if (isPlaying)
-                  playerController.pauseVideo();
-                else
-                  playerController.playVideo();
-              },
-              icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-              child: Text(isPlaying ? '일시정지' : '재생'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
