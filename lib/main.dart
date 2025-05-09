@@ -36,13 +36,13 @@ class MyApp extends StatelessWidget {
       title: '리듬농부 메이트',
       theme: ShadThemeData(
         brightness: Brightness.light,
-        colorScheme: const ShadSlateColorScheme.light(),
+        colorScheme: const ShadZincColorScheme.light(),
         radius: BorderRadius.circular(6.0), // 고정값 사용 또는 ShadRadius.md 사용 가능시 변경
         textTheme: appTextTheme,
       ),
       darkTheme: ShadThemeData(
         brightness: Brightness.dark,
-        colorScheme: const ShadSlateColorScheme.dark(),
+        colorScheme: const ShadZincColorScheme.dark(),
         radius: BorderRadius.circular(6.0),
         textTheme: appTextTheme,
       ),
