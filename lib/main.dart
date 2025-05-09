@@ -241,6 +241,8 @@ class _MyHomePageState extends State<MyHomePage> {
   static const Duration _tapTempoTimeout = Duration(seconds: 2);
   bool _bpmChangedByTap = false;
 
+  Timer? _bpmAdjustTimer; // BPM 조절 롱프레스용 타이머
+
   @override
   void initState() {
     super.initState();
@@ -342,6 +344,8 @@ class _MyHomePageState extends State<MyHomePage> {
     _metronomePlayer.dispose(); // 메트로놈 플레이어 리소스 해제
     _timer?.cancel();
     _bpmTimer?.cancel();
+    _tapTempoResetTimer?.cancel();
+    _bpmAdjustTimer?.cancel();
     super.dispose();
   }
 
@@ -534,6 +538,21 @@ class _MyHomePageState extends State<MyHomePage> {
         _updateProgress();
       }
     });
+  }
+
+  void _startBpmAdjustTimer(int delta) {
+    _bpmAdjustTimer?.cancel(); // 이전 타이머가 있다면 취소
+    // 즉시 한 번 호출 후, 타이머 시작
+    _changeBpm(delta);
+    _bpmAdjustTimer = Timer.periodic(const Duration(milliseconds: 150), (
+      timer,
+    ) {
+      _changeBpm(delta);
+    });
+  }
+
+  void _stopBpmAdjustTimer() {
+    _bpmAdjustTimer?.cancel();
   }
 
   Future<void> _onSongChanged(Song newSong) async {
@@ -822,19 +841,36 @@ class _MyHomePageState extends State<MyHomePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          iconSize: 30,
-                          color: theme.colorScheme.foreground,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          splashRadius: 24,
-                          onPressed:
+                        GestureDetector(
+                          onTap:
                               _isTimerRunning ||
                                       _isLoadingSong ||
                                       _currentManualBpm <= 30
                                   ? null
                                   : () => _changeBpm(-5),
+                          onLongPressStart:
+                              _isTimerRunning ||
+                                      _isLoadingSong ||
+                                      _currentManualBpm <= 30
+                                  ? null
+                                  : (details) => _startBpmAdjustTimer(-1),
+                          onLongPressEnd:
+                              _isTimerRunning || _isLoadingSong
+                                  ? null
+                                  : (details) => _stopBpmAdjustTimer(),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Icon(
+                              Icons.remove_circle_outline,
+                              size: 30,
+                              color:
+                                  (_isTimerRunning ||
+                                          _isLoadingSong ||
+                                          _currentManualBpm <= 30)
+                                      ? theme.colorScheme.mutedForeground
+                                      : theme.colorScheme.foreground,
+                            ),
+                          ),
                         ),
                         Expanded(
                           child: AnimatedContainer(
@@ -872,19 +908,36 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline),
-                          iconSize: 30,
-                          color: theme.colorScheme.foreground,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          splashRadius: 24,
-                          onPressed:
+                        GestureDetector(
+                          onTap:
                               _isTimerRunning ||
                                       _isLoadingSong ||
                                       _currentManualBpm >= 240
                                   ? null
                                   : () => _changeBpm(5),
+                          onLongPressStart:
+                              _isTimerRunning ||
+                                      _isLoadingSong ||
+                                      _currentManualBpm >= 240
+                                  ? null
+                                  : (details) => _startBpmAdjustTimer(1),
+                          onLongPressEnd:
+                              _isTimerRunning || _isLoadingSong
+                                  ? null
+                                  : (details) => _stopBpmAdjustTimer(),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Icon(
+                              Icons.add_circle_outline,
+                              size: 30,
+                              color:
+                                  (_isTimerRunning ||
+                                          _isLoadingSong ||
+                                          _currentManualBpm >= 240)
+                                      ? theme.colorScheme.mutedForeground
+                                      : theme.colorScheme.foreground,
+                            ),
+                          ),
                         ),
                       ],
                     ),
