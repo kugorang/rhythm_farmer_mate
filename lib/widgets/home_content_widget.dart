@@ -43,6 +43,7 @@ class HomeContentWidget extends StatelessWidget {
   final int fastBpm;
   final PlayMode playMode;
   final Function(PlayMode) onPlayModeChanged;
+  final bool isYoutubeMode;
 
   const HomeContentWidget({
     super.key,
@@ -77,12 +78,15 @@ class HomeContentWidget extends StatelessWidget {
     this.fastBpm = 120,
     required this.playMode,
     required this.onPlayModeChanged,
+    required this.isYoutubeMode,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final canInteractWithSettings = !isChallengeRunning && !isLoadingSong;
+    final bool localAudioControlsEnabled =
+        !isChallengeRunning && !isLoadingSong && !isYoutubeMode;
+    final bool bpmControlsEnabled = !isChallengeRunning && !isLoadingSong;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
@@ -93,18 +97,20 @@ class HomeContentWidget extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (isLoadingSong)
+          if (isLoadingSong && !isYoutubeMode) // 유튜브 로딩은 플레이어가 처리
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16.0),
               child: Center(child: CircularProgressIndicator()),
             ),
-          SongSelectionWidget(
-            songList: songList,
-            selectedSong: selectedSong,
-            isLoading: isLoadingSong,
-            isChallengeRunning: isChallengeRunning,
-            onSongChanged: onSongChanged,
-          ),
+          if (!isYoutubeMode)
+            SongSelectionWidget(
+              songList: songList,
+              selectedSong: selectedSong,
+              isLoading: isLoadingSong,
+              isChallengeRunning: isChallengeRunning,
+              onSongChanged: onSongChanged,
+            ),
+          if (!isYoutubeMode) const SizedBox(height: 12),
           PlaybackModeControlWidget(
             currentPlayMode: playMode,
             onPlayModeChanged: onPlayModeChanged,
@@ -117,7 +123,7 @@ class HomeContentWidget extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Visibility(
-            visible: canInteractWithSettings, // 직접 계산
+            visible: bpmControlsEnabled,
             child: BpmControlSectionWidget(
               isLoadingSong: isLoadingSong,
               isChallengeRunning: isChallengeRunning,
@@ -139,7 +145,7 @@ class HomeContentWidget extends StatelessWidget {
               fastBpm: fastBpm,
             ),
           ),
-          if (canInteractWithSettings) // 직접 계산
+          if (bpmControlsEnabled)
             const SizedBox(height: 24)
           else
             const SizedBox(height: 12),
@@ -149,19 +155,20 @@ class HomeContentWidget extends StatelessWidget {
             progressPercent: progressPercent,
           ),
           const SizedBox(height: 30),
-          MusicControlWidget(
-            isLoadingSong: isLoadingSong,
-            isChallengeRunning: isChallengeRunning,
-            isPlaying: isPlaying,
-            selectedSong: selectedSong,
-            audioDuration: audioDuration,
-            currentPlaybackSpeed: currentPlaybackSpeed,
-            currentManualBpm: currentManualBpm,
-            defaultBorderRadius: defaultBorderRadius,
-            onPlayPause: onPlayPause,
-            onStop: onStop,
-          ),
-          const SizedBox(height: 30),
+          if (localAudioControlsEnabled)
+            MusicControlWidget(
+              isLoadingSong: isLoadingSong,
+              isChallengeRunning: isChallengeRunning,
+              isPlaying: isPlaying,
+              selectedSong: selectedSong,
+              audioDuration: audioDuration,
+              currentPlaybackSpeed: currentPlaybackSpeed,
+              currentManualBpm: currentManualBpm,
+              defaultBorderRadius: defaultBorderRadius,
+              onPlayPause: onPlayPause,
+              onStop: onStop,
+            ),
+          if (localAudioControlsEnabled) const SizedBox(height: 30),
           ChallengeControlButtonWidget(
             isLoadingSong: isLoadingSong,
             isChallengeRunning: isChallengeRunning,
