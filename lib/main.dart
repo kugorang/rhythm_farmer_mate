@@ -669,7 +669,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                         ),
                                       )
                                       : Text(
-                                        '속도: $_currentManualBpm',
+                                        '현재 박자: $_currentManualBpm',
                                         style: theme.textTheme.p.copyWith(
                                           color: bpmTextColor,
                                           fontWeight: FontWeight.bold,
@@ -739,8 +739,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               padding: const EdgeInsets.only(top: 4.0),
                               child: Text(
                                 _currentPlaybackSpeed == 1.0
-                                    ? "(원곡 속도, 현재 속도: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'})"
-                                    : '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (원곡 속도: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'} -> 현재 속도: $_currentManualBpm)',
+                                    ? "(원곡 빠르기, 현재 박자: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'})"
+                                    : '재생 빠르기: ${_currentPlaybackSpeed.toStringAsFixed(1)}배 (원곡 박자: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'} -> 현재 박자: $_currentManualBpm)',
                                 style: theme.textTheme.small.copyWith(
                                   color: theme.colorScheme.mutedForeground,
                                 ),
