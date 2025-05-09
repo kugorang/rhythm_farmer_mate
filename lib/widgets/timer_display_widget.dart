@@ -32,25 +32,34 @@ class TimerDisplayWidget extends StatelessWidget {
       label: accessibilityText,
       excludeSemantics: true,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 20.0),
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        child:
-            isLoadingSong
-                ? Container(
-                  width: double.infinity,
-                  height: 48,
-                  alignment: Alignment.center,
-                  child: const LinearProgressIndicator(),
-                )
-                : Text(
-                  timerText,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.h1.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.foreground,
-                    letterSpacing: 1.5,
-                  ),
-                ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color:
+              isLoadingSong
+                  ? theme.colorScheme.muted.withOpacity(0.5)
+                  : theme.colorScheme.secondary,
+          borderRadius: borderRadius,
+          border: Border.all(
+            color:
+                isLoadingSong
+                    ? theme.colorScheme.border.withOpacity(0.5)
+                    : theme.colorScheme.secondaryForeground.withOpacity(0.2),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            timerText,
+            style: theme.textTheme.h1.copyWith(
+              color:
+                  isLoadingSong
+                      ? theme.colorScheme.mutedForeground
+                      : theme.colorScheme.secondaryForeground,
+              fontSize: 60,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2.0,
+            ),
+          ),
+        ),
       ),
     );
   }

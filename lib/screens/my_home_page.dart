@@ -11,6 +11,8 @@ import 'package:rhythm_farmer_mate/my_app.dart'; // themeModeNotifier 접근을 
 import '../widgets/playlist_dialog_widget.dart'; // 새로 추가된 위젯
 import '../widgets/metronome_settings_dialog_widget.dart'; // 새로 추가된 위젯
 import '../services/audio_service.dart'; // AudioService 추가
+import '../services/bpm_service.dart';
+import '../services/challenge_service.dart';
 
 // 재생 모드 정의
 enum PlayMode {
@@ -260,11 +262,17 @@ class _MyHomePageState extends State<MyHomePage> {
       _youtubeController?.close(); // 이전 컨트롤러 정리
       if (mounted) setState(() => _isLoadingSong = true);
 
-      _youtubeController = YoutubePlayerController();
-      _youtubeController!.loadVideoById(videoId: _selectedSong.youtubeVideoId!);
+      final params = YoutubePlayerParams(
+        showControls: false,
+        showFullscreenButton: false,
+        strictRelatedVideos: true,
+        enableCaption: false,
+        color: 'red',
+        interfaceLanguage: 'ko',
+      );
 
-      // YoutubeValueBuilder를 통해 상태를 감지하므로 별도 리스너 불필요.
-      // 초기값 설정은 build 메서드 내의 YoutubeValueBuilder에서 최초 빌드 시 수행.
+      _youtubeController = YoutubePlayerController(params: params);
+      _youtubeController!.loadVideoById(videoId: _selectedSong.youtubeVideoId!);
 
       // 비디오가 로드될 시간을 약간 줌 (메타데이터 로드 등)
       Future.delayed(const Duration(milliseconds: 1500), () {
@@ -335,84 +343,62 @@ class _MyHomePageState extends State<MyHomePage> {
 
     Widget playerWidget = const SizedBox.shrink();
     if (_isYoutubeMode && _youtubeController != null) {
-      playerWidget = YoutubePlayerScaffold(
+      playerWidget = YouTubePlayerWidget(
         controller: _youtubeController!,
-        aspectRatio: 16 / 9,
-        builder: (context, player) {
-          // YoutubeValueBuilder를 사용하여 플레이어 상태 변경 시 UI 업데이트 및 상태 반영
-          return YoutubeValueBuilder(
-            controller: _youtubeController!,
-            buildWhen: (previous, current) {
-              // 필요한 상태 변경(재생 상태, 메타데이터) 시에만 빌드
-              return previous.playerState != current.playerState ||
-                  previous.metaData != current.metaData;
-            },
-            builder: (context, value) {
-              // 메인 MyHomePageState의 상태 변수 업데이트
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                if (!mounted) return;
+        timerText: _timerText,
+        progressPercent: _progressPercent,
+        isChallengeRunning: _isChallengeRunning,
+        onChallengeButtonPressed: () {
+          if (_isChallengeRunning) {
+            _stopChallenge();
+          } else {
+            _startChallenge();
+          }
+        },
+        onPlayerStateChanged: (state, position, duration) {
+          // 유튜브 플레이어 상태 변경 처리
+          if (!mounted) return;
 
-                final newPlayerState = value.playerState;
-                final newMetaData = value.metaData;
-                // 현재 재생 위치는 비동기로 가져와야 함
-                double currentPositionSeconds = 0;
-                try {
-                  currentPositionSeconds =
-                      await _youtubeController!.currentTime;
-                } catch (e) {
-                  /* ignore */
-                }
-                final newPosition = Duration(
-                  milliseconds: (currentPositionSeconds * 1000).round(),
-                );
+          bool shouldSetState = false;
 
-                bool shouldSetState = false;
+          // 재생 상태 변경
+          if (_isYoutubePlaying != (state == PlayerState.playing)) {
+            _isYoutubePlaying = state == PlayerState.playing;
+            shouldSetState = true;
+          }
 
-                if (_isYoutubePlaying !=
-                    (newPlayerState == PlayerState.playing)) {
-                  _isYoutubePlaying = newPlayerState == PlayerState.playing;
-                  shouldSetState = true;
-                }
+          // 영상 정보 변경
+          if (duration.inSeconds > 0 && _youtubeDuration != duration) {
+            _youtubeDuration = duration;
+            if (!_isChallengeRunning) {
+              _remainingTime = duration - position;
+              if (_remainingTime.isNegative) _remainingTime = Duration.zero;
+              _updateTimerText();
+            }
+            shouldSetState = true;
+          }
 
-                if (newMetaData.duration.inSeconds > 0 &&
-                    _youtubeDuration != newMetaData.duration) {
-                  _youtubeDuration = newMetaData.duration;
-                  if (!_isChallengeRunning) {
-                    _remainingTime =
-                        _youtubeDuration -
-                        newPosition; // 최초 로드 시 또는 영상 변경 시 남은 시간 설정
-                    if (_remainingTime.isNegative)
-                      _remainingTime = Duration.zero;
-                    _updateTimerText();
-                  }
-                  shouldSetState = true;
-                }
+          // 챌린지 중이 아닐 때 남은 시간 업데이트
+          if (!_isChallengeRunning && _youtubeDuration.inSeconds > 0) {
+            final newRemainingTime = _youtubeDuration - position;
+            if (_remainingTime != newRemainingTime &&
+                !newRemainingTime.isNegative) {
+              _remainingTime = newRemainingTime;
+              _updateTimerText();
+              shouldSetState = true;
+            }
+          }
 
-                // 챌린지 중이 아닐 때, 유튜브 영상의 현재 재생 위치에 따라 _remainingTime 업데이트
-                if (!_isChallengeRunning && _youtubeDuration.inSeconds > 0) {
-                  final newRemainingTime = _youtubeDuration - newPosition;
-                  if (_remainingTime != newRemainingTime &&
-                      !newRemainingTime.isNegative) {
-                    _remainingTime = newRemainingTime;
-                    _updateTimerText();
-                    shouldSetState = true;
-                  }
-                }
+          if (shouldSetState) {
+            setState(() {
+              _updateProgress();
+            });
+          }
 
-                if (shouldSetState) {
-                  setState(() {
-                    _updateProgress(); // 상태 변경 후 진행도 다시 계산
-                  });
-                }
-
-                if (newPlayerState == PlayerState.ended &&
-                    !_isChallengeRunning) {
-                  _handleYouTubeVideoEnded();
-                }
-              });
-              return player; // 실제 플레이어 UI 반환
-            },
-          );
+          // 영상 종료 처리
+          if (state == PlayerState.ended && !_isChallengeRunning) {
+            _handleYouTubeVideoEnded();
+          }
         },
       );
     }
@@ -438,60 +424,57 @@ class _MyHomePageState extends State<MyHomePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (_isYoutubeMode) playerWidget,
+                    if (_isYoutubeMode) Expanded(child: playerWidget),
                     if (_isYoutubeMode) const SizedBox(height: 16),
                     Expanded(
-                      child: SingleChildScrollView(
-                        child: HomeContentWidget(
-                          isLoadingSong: _isLoadingSong,
-                          isChallengeRunning: _isChallengeRunning,
-                          selectedSong: _selectedSong,
-                          songList:
-                              _filteredSongList, // HomeContentWidget에서 더 이상 사용 안함
-                          onSongChanged: (song) {
-                            if (song != null) _onSongChanged(song);
-                          },
-                          timerText: _timerText,
-                          defaultBorderRadius: defaultBorderRadius,
-                          beatHighlighter: _beatHighlighter,
-                          bpmChangedByTap: _bpmChangedByTap,
-                          bpmIndicatorScale: _beatHighlighter ? 1.1 : 1.0,
-                          bpmIndicatorColor: bpmIndicatorColor,
-                          bpmTextColor: bpmTextColor,
-                          tapTimestamps: _tapTimestamps,
-                          currentManualBpm: _currentManualBpm,
-                          onChangeBpmToPreset: _changeBpmToPreset,
-                          onChangeBpm: _changeBpm,
-                          onStartBpmAdjustTimer:
-                              (int _) => _startBpmAdjustTimer(),
-                          onStopBpmAdjustTimer: () => _bpmAdjustTimer?.cancel(),
-                          onHandleTapForBpm: _handleTapForBpm,
-                          progressPercent: _progressPercent,
-                          isPlaying:
-                              _isYoutubeMode
-                                  ? _isYoutubePlaying
-                                  : _audioService.isPlaying,
-                          audioDuration:
-                              _isYoutubeMode
-                                  ? _youtubeDuration
-                                  : _audioService.duration,
-                          currentPlaybackSpeed: _currentPlaybackSpeed,
-                          onPlayPause: _handlePlayPause,
-                          onStop: _handleStop,
-                          onChallengeButtonPressed: () {
-                            if (_isChallengeRunning) {
-                              _stopChallenge();
-                            } else {
-                              _startChallenge();
-                            }
-                          },
-                          slowBpm: slowBpm,
-                          normalBpm: normalBpm,
-                          fastBpm: fastBpm,
-                          playMode: _playMode,
-                          onPlayModeChanged: _changePlayMode,
-                          isYoutubeMode: _isYoutubeMode,
-                        ),
+                      child: HomeContentWidget(
+                        isLoadingSong: _isLoadingSong,
+                        isChallengeRunning: _isChallengeRunning,
+                        selectedSong: _selectedSong,
+                        songList: _filteredSongList,
+                        onSongChanged: (song) {
+                          if (song != null) _onSongChanged(song);
+                        },
+                        timerText: _timerText,
+                        defaultBorderRadius: defaultBorderRadius,
+                        beatHighlighter: _beatHighlighter,
+                        bpmChangedByTap: _bpmChangedByTap,
+                        bpmIndicatorScale: _beatHighlighter ? 1.1 : 1.0,
+                        bpmIndicatorColor: bpmIndicatorColor,
+                        bpmTextColor: bpmTextColor,
+                        tapTimestamps: _tapTimestamps,
+                        currentManualBpm: _currentManualBpm,
+                        onChangeBpmToPreset: _changeBpmToPreset,
+                        onChangeBpm: _changeBpm,
+                        onStartBpmAdjustTimer:
+                            (int _) => _startBpmAdjustTimer(),
+                        onStopBpmAdjustTimer: () => _bpmAdjustTimer?.cancel(),
+                        onHandleTapForBpm: _handleTapForBpm,
+                        progressPercent: _progressPercent,
+                        isPlaying:
+                            _isYoutubeMode
+                                ? _isYoutubePlaying
+                                : _audioService.isPlaying,
+                        audioDuration:
+                            _isYoutubeMode
+                                ? _youtubeDuration
+                                : _audioService.duration,
+                        currentPlaybackSpeed: _currentPlaybackSpeed,
+                        onPlayPause: _handlePlayPause,
+                        onStop: _handleStop,
+                        onChallengeButtonPressed: () {
+                          if (_isChallengeRunning) {
+                            _stopChallenge();
+                          } else {
+                            _startChallenge();
+                          }
+                        },
+                        slowBpm: slowBpm,
+                        normalBpm: normalBpm,
+                        fastBpm: fastBpm,
+                        playMode: _playMode,
+                        onPlayModeChanged: _changePlayMode,
+                        isYoutubeMode: _isYoutubeMode,
                       ),
                     ),
                   ],
@@ -824,18 +807,24 @@ class _MyHomePageState extends State<MyHomePage> {
   void _changeBpmToPreset(int bpm) {
     if (_isLoadingSong) return;
     double newSpeed;
+    int originalBpm = _selectedSong.bpm;
+
+    // 원래 노래 BPM에 상대적으로 계산
     if (bpm == slowBpm) {
       newSpeed = slowSpeed; // 0.5
+      _currentManualBpm = (originalBpm * 0.5).round();
     } else if (bpm == normalBpm) {
       newSpeed = normalSpeed; // 1.0
+      _currentManualBpm = originalBpm;
     } else if (bpm == fastBpm) {
       newSpeed = fastSpeed; // 1.5
+      _currentManualBpm = (originalBpm * 1.5).round();
     } else {
       newSpeed = normalSpeed;
+      _currentManualBpm = originalBpm;
     }
 
     setState(() {
-      _currentManualBpm = bpm;
       _currentPlaybackSpeed = newSpeed;
       _bpmChangedByTap = false;
     });

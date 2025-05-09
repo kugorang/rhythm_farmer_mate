@@ -203,6 +203,13 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     final categories = SongCategory.getCategories();
     final theme = ShadTheme.of(context);
 
+    // "내 노동요 등록" 카테고리를 찾아서 분리하거나, FAB에서만 처리하도록 결정
+    // 여기서는 categories 리스트에서 제거하고 FAB으로만 기능을 제공하는 것으로 가정
+    final mainCategories =
+        categories
+            .where((cat) => cat.type != SongCategoryType.userRegistered)
+            .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -228,8 +235,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                   themeModeNotifier.value =
                       currentMode == ThemeMode.light
                           ? ThemeMode.dark
-                          : currentMode == ThemeMode.dark
-                          ? ThemeMode.system
                           : ThemeMode.light;
                 },
               );
@@ -238,36 +243,68 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         ],
       ),
       body: ListView.builder(
-        itemCount: categories.length,
+        itemCount: mainCategories.length, // userRegistered 제외한 카테고리 수
         itemBuilder: (context, index) {
-          final category = categories[index];
+          final category = mainCategories[index];
           return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: theme.colorScheme.card,
             child: ListTile(
-              title: Text(category.title, style: theme.textTheme.large),
-              subtitle: Text(category.description, style: theme.textTheme.p),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ), // 패딩 증가
+              title: Text(
+                category.title,
+                style: theme.textTheme.h4.copyWith(fontWeight: FontWeight.bold),
+              ), // 폰트 스타일 조정
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  category.description,
+                  style: theme.textTheme.p,
+                ), // 폰트 스타일 조정
+              ),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ), // 아이콘 크기 및 색상
               onTap: () {
-                if (category.type == SongCategoryType.userRegistered) {
-                  _showAddSongDialog();
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => MyHomePage(
-                            selectedCategoryType: category.type,
-                            userSongs: [],
-                          ),
-                    ),
-                  );
-                }
+                // userRegistered 카테고리 탭 로직은 FAB으로 이동
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => MyHomePage(
+                          selectedCategoryType: category.type,
+                          userSongs: [], // 사용자 곡은 여기서 전달 안 함
+                        ),
+                  ),
+                );
               },
             ),
           );
         },
       ),
+      floatingActionButton: ShadButton(
+        size: ShadButtonSize.lg,
+        onPressed: _showAddSongDialog,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add_rounded, size: 24), // 아이콘 크기 약간 조정
+            const SizedBox(width: 8),
+            const Text(
+              '내 노동요 추가',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        // backgroundColor: theme.colorScheme.primary,
+        // foregroundColor: theme.colorScheme.primaryForeground,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

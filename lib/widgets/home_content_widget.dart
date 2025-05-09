@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../models/song.dart';
+import '../models/song_category.dart'; // SongCategoryType을 사용하기 위해 추가
 import '../screens/my_home_page.dart'
     show PlayMode; // MyHomePageState의 public 메서드/변수 접근을 위해
 import './timer_display_widget.dart';
@@ -88,94 +89,124 @@ class HomeContentWidget extends StatelessWidget {
         !isChallengeRunning && !isLoadingSong && !isYoutubeMode;
     final bool bpmControlsEnabled = !isChallengeRunning && !isLoadingSong;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24.0, // 반응형 패딩은 MyHomePage에서 처리
-        vertical: 24.0,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          if (isLoadingSong && !isYoutubeMode) // 유튜브 로딩은 플레이어가 처리
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0),
-              child: Center(child: CircularProgressIndicator()),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // 스크롤 가능한 상단 영역 (컨텐츠 영역)
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 16.0,
             ),
-          if (!isYoutubeMode)
-            SongSelectionWidget(
-              songList: songList,
-              selectedSong: selectedSong,
-              isLoading: isLoadingSong,
-              isChallengeRunning: isChallengeRunning,
-              onSongChanged: onSongChanged,
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (isLoadingSong && !isYoutubeMode) // 유튜브 로딩은 플레이어가 처리
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  if (!isYoutubeMode)
+                    SongSelectionWidget(
+                      songList: songList,
+                      selectedSong: selectedSong,
+                      isLoading: isLoadingSong,
+                      isChallengeRunning: isChallengeRunning,
+                      onSongChanged: onSongChanged,
+                      initialFilterCategory: null, // 초기 필터 설정 없음
+                    ),
+                  const SizedBox(height: 16),
+                  PlaybackModeControlWidget(
+                    currentPlayMode: playMode,
+                    onPlayModeChanged: onPlayModeChanged,
+                    isDisabled: isLoadingSong || isChallengeRunning,
+                  ),
+                  const SizedBox(height: 16),
+                  TimerDisplayWidget(
+                    isLoadingSong: isLoadingSong,
+                    timerText: timerText,
+                    borderRadius: defaultBorderRadius,
+                  ),
+                  const SizedBox(height: 16),
+                  if (bpmControlsEnabled)
+                    BpmControlSectionWidget(
+                      isLoadingSong: isLoadingSong,
+                      isChallengeRunning: isChallengeRunning,
+                      currentManualBpm: currentManualBpm,
+                      beatHighlighter: beatHighlighter,
+                      bpmChangedByTap: bpmChangedByTap,
+                      bpmIndicatorScale: bpmIndicatorScale,
+                      bpmIndicatorColor: bpmIndicatorColor,
+                      bpmTextColor: bpmTextColor,
+                      defaultBorderRadius: defaultBorderRadius,
+                      tapTimestamps: tapTimestamps,
+                      onChangeBpmToPreset: onChangeBpmToPreset,
+                      onChangeBpm: onChangeBpm,
+                      onStartBpmAdjustTimer: onStartBpmAdjustTimer,
+                      onStopBpmAdjustTimer: onStopBpmAdjustTimer,
+                      onHandleTapForBpm: onHandleTapForBpm,
+                      slowBpm: slowBpm,
+                      normalBpm: normalBpm,
+                      fastBpm: fastBpm,
+                    ),
+                ],
+              ),
             ),
-          if (!isYoutubeMode) const SizedBox(height: 12),
-          PlaybackModeControlWidget(
-            currentPlayMode: playMode,
-            onPlayModeChanged: onPlayModeChanged,
-            isDisabled: isLoadingSong || isChallengeRunning,
           ),
-          TimerDisplayWidget(
-            isLoadingSong: isLoadingSong,
-            timerText: timerText,
-            borderRadius: defaultBorderRadius,
-          ),
-          const SizedBox(height: 12),
-          Visibility(
-            visible: bpmControlsEnabled,
-            child: BpmControlSectionWidget(
-              isLoadingSong: isLoadingSong,
-              isChallengeRunning: isChallengeRunning,
-              currentManualBpm: currentManualBpm,
-              beatHighlighter: beatHighlighter,
-              bpmChangedByTap: bpmChangedByTap,
-              bpmIndicatorScale: bpmIndicatorScale,
-              bpmIndicatorColor: bpmIndicatorColor,
-              bpmTextColor: bpmTextColor,
-              defaultBorderRadius: defaultBorderRadius,
-              tapTimestamps: tapTimestamps,
-              onChangeBpmToPreset: onChangeBpmToPreset,
-              onChangeBpm: onChangeBpm,
-              onStartBpmAdjustTimer: onStartBpmAdjustTimer,
-              onStopBpmAdjustTimer: onStopBpmAdjustTimer,
-              onHandleTapForBpm: onHandleTapForBpm,
-              slowBpm: slowBpm,
-              normalBpm: normalBpm,
-              fastBpm: fastBpm,
+        ),
+
+        // 하단 고정 영역 (제어 영역) - SafeArea로 감싸서 안전한 영역에 표시
+        SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.background,
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.border.withOpacity(0.3),
+                  blurRadius: 5,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ProgressDisplayWidget(
+                  isLoadingSong: isLoadingSong,
+                  isChallengeRunning: isChallengeRunning,
+                  progressPercent: progressPercent,
+                ),
+                const SizedBox(height: 16),
+                if (localAudioControlsEnabled)
+                  MusicControlWidget(
+                    isLoadingSong: isLoadingSong,
+                    isChallengeRunning: isChallengeRunning,
+                    isPlaying: isPlaying,
+                    selectedSong: selectedSong,
+                    audioDuration: audioDuration,
+                    currentPlaybackSpeed: currentPlaybackSpeed,
+                    currentManualBpm: currentManualBpm,
+                    defaultBorderRadius: defaultBorderRadius,
+                    onPlayPause: onPlayPause,
+                    onStop: onStop,
+                  ),
+                if (localAudioControlsEnabled) const SizedBox(height: 16),
+                ChallengeControlButtonWidget(
+                  isLoadingSong: isLoadingSong,
+                  isChallengeRunning: isChallengeRunning,
+                  onPressed: onChallengeButtonPressed,
+                ),
+              ],
             ),
           ),
-          if (bpmControlsEnabled)
-            const SizedBox(height: 24)
-          else
-            const SizedBox(height: 12),
-          ProgressDisplayWidget(
-            isLoadingSong: isLoadingSong,
-            isChallengeRunning: isChallengeRunning,
-            progressPercent: progressPercent,
-          ),
-          const SizedBox(height: 30),
-          if (localAudioControlsEnabled)
-            MusicControlWidget(
-              isLoadingSong: isLoadingSong,
-              isChallengeRunning: isChallengeRunning,
-              isPlaying: isPlaying,
-              selectedSong: selectedSong,
-              audioDuration: audioDuration,
-              currentPlaybackSpeed: currentPlaybackSpeed,
-              currentManualBpm: currentManualBpm,
-              defaultBorderRadius: defaultBorderRadius,
-              onPlayPause: onPlayPause,
-              onStop: onStop,
-            ),
-          if (localAudioControlsEnabled) const SizedBox(height: 30),
-          ChallengeControlButtonWidget(
-            isLoadingSong: isLoadingSong,
-            isChallengeRunning: isChallengeRunning,
-            onPressed: onChallengeButtonPressed,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

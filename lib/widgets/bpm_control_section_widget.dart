@@ -88,12 +88,15 @@ class BpmControlSectionWidget extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Text('BPM', style: theme.textTheme.muted),
+                      Text(
+                        'BPM',
+                        style: theme.textTheme.muted.copyWith(fontSize: 18),
+                      ),
                       const SizedBox(height: 2),
                       Text(
                         currentManualBpm.toString(),
                         style: TextStyle(
-                          fontSize: 36,
+                          fontSize: 48,
                           color:
                               isDisabled
                                   ? theme.colorScheme.mutedForeground
@@ -116,57 +119,81 @@ class BpmControlSectionWidget extends StatelessWidget {
           children: <Widget>[
             // 느리게 버튼
             Semantics(
-              label: '느린 템포',
+              label: '느린 템포로 변경',
               value: '$slowBpm BPM',
               button: true,
               enabled: !isDisabled,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: ShadButton(
-                  size: ShadButtonSize.sm,
+                  size: ShadButtonSize.lg,
                   onPressed:
                       isDisabled ? null : () => onChangeBpmToPreset(slowBpm),
-                  child: Text('$slowBpm'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      '느리게',
+                      style: theme.textTheme.p.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
 
             // 중간 버튼
             Semantics(
-              label: '중간 템포',
+              label: '보통 템포로 변경',
               value: '$normalBpm BPM',
               button: true,
               enabled: !isDisabled,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: ShadButton(
-                  size: ShadButtonSize.sm,
+                  size: ShadButtonSize.lg,
                   onPressed:
                       isDisabled ? null : () => onChangeBpmToPreset(normalBpm),
-                  child: Text('$normalBpm'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      '보통',
+                      style: theme.textTheme.p.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
 
             // 빠르게 버튼
             Semantics(
-              label: '빠른 템포',
+              label: '빠른 템포로 변경',
               value: '$fastBpm BPM',
               button: true,
               enabled: !isDisabled,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: ShadButton(
-                  size: ShadButtonSize.sm,
+                  size: ShadButtonSize.lg,
                   onPressed:
                       isDisabled ? null : () => onChangeBpmToPreset(fastBpm),
-                  child: Text('$fastBpm'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      '빠르게',
+                      style: theme.textTheme.p.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
         // BPM 미세 조절 버튼
         Row(
@@ -182,17 +209,24 @@ class BpmControlSectionWidget extends StatelessWidget {
                 onPointerDown:
                     isDisabled
                         ? null
-                        : (event) => onStartBpmAdjustTimer(0), // 값은 무시되므로 0 전달
-                onPointerUp: isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                        : (event) {
+                          onStartBpmAdjustTimer?.call(0);
+                        },
+                onPointerUp:
+                    isDisabled ? null : (_) => onStopBpmAdjustTimer?.call(),
                 onPointerCancel:
-                    isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                    isDisabled ? null : (_) => onStopBpmAdjustTimer?.call(),
                 child: ShadButton(
-                  onPressed: isDisabled ? null : () => onChangeBpm(-1),
-                  child: const Icon(Icons.remove),
+                  size: ShadButtonSize.lg,
+                  onPressed: isDisabled ? null : () => onChangeBpm?.call(-1),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(Icons.remove, size: 24),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 24),
 
             // 증가 버튼
             Semantics(
@@ -204,13 +238,20 @@ class BpmControlSectionWidget extends StatelessWidget {
                 onPointerDown:
                     isDisabled
                         ? null
-                        : (event) => onStartBpmAdjustTimer(0), // 값은 무시되므로 0 전달
-                onPointerUp: isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                        : (event) {
+                          onStartBpmAdjustTimer?.call(0);
+                        },
+                onPointerUp:
+                    isDisabled ? null : (_) => onStopBpmAdjustTimer?.call(),
                 onPointerCancel:
-                    isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                    isDisabled ? null : (_) => onStopBpmAdjustTimer?.call(),
                 child: ShadButton(
-                  onPressed: isDisabled ? null : () => onChangeBpm(1),
-                  child: const Icon(Icons.add),
+                  size: ShadButtonSize.lg,
+                  onPressed: isDisabled ? null : () => onChangeBpm?.call(1),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(Icons.add, size: 24),
+                  ),
                 ),
               ),
             ),
