@@ -134,96 +134,97 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _bpmTimer;
   bool _beatHighlighter = false;
 
+  // bpm : https://tunebat.com/Analyzer
   final List<Song> _songList = const [
     // 현대 노동요
     Song(
       filePath: 'assets/audio/emart_original.mp3',
       title: '이마트 로고송',
-      bpm: 125,
-    ), // BPM은 예시
+      bpm: 100,
+    ),
     // CD-01
     Song(
       filePath: 'assets/audio/CD01-01.mp3',
       title: '논삶는소리 (강원 홍천군)',
-      bpm: 60,
+      bpm: 69,
     ),
     Song(
       filePath: 'assets/audio/CD01-02.mp3',
       title: '논고르는소리 (제주 서귀포시)',
-      bpm: 70,
+      bpm: 93,
     ),
     Song(
       filePath: 'assets/audio/CD01-03.mp3',
       title: '모찌는소리-"얼른 하더니 한 춤" (강원 양양군)',
-      bpm: 110,
+      bpm: 70,
     ),
     Song(
       filePath: 'assets/audio/CD01-04.mp3',
       title: '모찌는소리-"뭉치세 제치세" (충북 진천군)',
-      bpm: 115,
+      bpm: 76,
     ),
     // CD-02
     Song(
       filePath: 'assets/audio/CD02-01.mp3',
       title: '논매는소리-"헤헤 곯었네" (경기 안성군)',
-      bpm: 80,
+      bpm: 52,
     ),
     Song(
       filePath: 'assets/audio/CD02-02.mp3',
       title: '논매는소리-대허리 (경기 이천군)',
-      bpm: 85,
+      bpm: 115,
     ),
     Song(
       filePath: 'assets/audio/CD02-03.mp3',
       title: '논매는소리-오독떼기 (강원 양양군)',
-      bpm: 90,
+      bpm: 107,
     ),
     Song(
       filePath: 'assets/audio/CD02-04.mp3',
       title: '논매는소리-"얼카 덩어리" (충남 홍성군)',
-      bpm: 95,
+      bpm: 62,
     ),
     // CD-03
     Song(
       filePath: 'assets/audio/CD03-01.mp3',
       title: '논매는소리-긴소리/들래기소리 (전남 무안군)',
-      bpm: 75,
+      bpm: 66,
     ),
     Song(
       filePath: 'assets/audio/CD03-02.mp3',
       title: '논매는소리-소오니소리 (경북 구미시)',
-      bpm: 80,
+      bpm: 55,
     ),
     Song(
       filePath: 'assets/audio/CD03-03.mp3',
       title: '논매는소리 (경북 예천군)',
-      bpm: 85,
+      bpm: 78,
     ),
     Song(
       filePath: 'assets/audio/CD03-04.mp3',
       title: '농사장원례소리-애롱대롱 (전남 나주군)',
-      bpm: 100,
+      bpm: 91,
     ),
     // CD-04
     Song(
       filePath: 'assets/audio/CD04-01.mp3',
       title: '밭가는소리 (강원 홍천군)',
-      bpm: 65,
+      bpm: 132,
     ),
     Song(
       filePath: 'assets/audio/CD04-02.mp3',
       title: '밭일구는소리(따비질) (제주 북제주군)',
-      bpm: 70,
+      bpm: 72,
     ),
     Song(
       filePath: 'assets/audio/CD04-03.mp3',
       title: '밭고르는소리(곰방메질) (제주 북제주군)',
-      bpm: 75,
+      bpm: 64,
     ),
     Song(
       filePath: 'assets/audio/CD04-04.mp3',
       title: '밭밟는소리 (제주 북제주군)',
-      bpm: 80,
+      bpm: 69,
     ),
   ];
   late Song _selectedSong;
@@ -236,9 +237,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   List<DateTime> _tapTimestamps = [];
   Timer? _tapTempoResetTimer;
-  static const int _minTapsForBpm = 4;
-  static const Duration _tapTempoTimeout = Duration(seconds: 3);
-  bool _bpmChangedByTap = false; // BPM 탭 성공 시각적 피드백용
+  static const int _minTapsForBpm = 2;
+  static const Duration _tapTempoTimeout = Duration(seconds: 2);
+  bool _bpmChangedByTap = false;
 
   @override
   void initState() {
@@ -570,28 +571,28 @@ class _MyHomePageState extends State<MyHomePage> {
       ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
       return;
     }
+
     final now = DateTime.now();
-    if (mounted)
+    if (mounted) {
+      // 탭 기록이 이미 최대치(2)에 도달했으면, 가장 오래된 기록을 제거하고 새 기록 추가 (슬라이딩 윈도우 방식)
+      if (_tapTimestamps.length >= _minTapsForBpm) {
+        _tapTimestamps.removeAt(0);
+      }
       setState(() {
         _tapTimestamps.add(now);
       });
+    }
+
     _tapTempoResetTimer?.cancel();
+
     if (_tapTimestamps.length >= _minTapsForBpm) {
-      List<int> intervals = [];
-      for (int i = 0; i < _tapTimestamps.length - 1; i++) {
-        intervals.add(
-          _tapTimestamps[i + 1].difference(_tapTimestamps[i]).inMilliseconds,
-        );
-      }
+      // 이제 _tapTimestamps에는 항상 2개의 timestamp만 존재
+      final intervalMs =
+          _tapTimestamps[1].difference(_tapTimestamps[0]).inMilliseconds;
 
-      final averageInterval =
-          intervals.isNotEmpty
-              ? intervals.reduce((a, b) => a + b) / intervals.length
-              : 0;
-
-      if (averageInterval > 250 && averageInterval < 2000) {
-        // BPM 30 ~ 240 범위에 해당하는 간격 (2000ms ~ 250ms)
-        final newBpm = (60000 / averageInterval).round().clamp(30, 240);
+      if (intervalMs > 250 && intervalMs < 2000) {
+        // BPM 30 ~ 240 범위에 해당하는 간격
+        final newBpm = (60000 / intervalMs).round().clamp(30, 240);
         setState(() {
           _currentManualBpm = newBpm;
           final songBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
@@ -616,7 +617,7 @@ class _MyHomePageState extends State<MyHomePage> {
             _updateTimerText();
             _updateProgress();
           }
-          _bpmChangedByTap = true; // 시각적 피드백 활성화
+          _bpmChangedByTap = true;
         });
         if (mounted) {
           ShadToaster.of(context).show(
@@ -631,31 +632,27 @@ class _MyHomePageState extends State<MyHomePage> {
               _bpmChangedByTap = false;
             });
         });
-        _tapTimestamps.clear();
+        // _tapTimestamps.clear(); // 2번 탭마다 바로 계산하므로, 여기서는 초기화 안 함 (계속 2개 유지)
       } else {
         if (mounted)
-          ShadToaster.of(
-            context,
-          ).show(ShadToast(description: const Text('엇, 박자가 안 맞네요. 다시 탭해주세요.')));
-        _tapTimestamps.clear();
+          ShadToaster.of(context).show(
+            ShadToast(
+              description: const Text('엇, 박자가 너무 빠르거나 느리네요. 다시 탭해주세요.'),
+            ),
+          );
+        // _tapTimestamps.clear(); // 잘못된 간격이라도, 다음 탭을 위해 이전 탭은 유지할 수 있음. 또는 초기화.
       }
     } else {
+      // 1번 탭했을 때 (아직 2번 미만)
       _tapTempoResetTimer = Timer(_tapTempoTimeout, () {
         if (_tapTimestamps.isNotEmpty &&
             _tapTimestamps.length < _minTapsForBpm) {
-          if (mounted)
-            ShadToaster.of(context).show(
-              ShadToast(
-                description: Text(
-                  '박자 계산에 필요한 탭 횟수가 부족해요. (최소 ${_minTapsForBpm}번)',
-                ),
-              ),
-            );
+          // 타임아웃 시 메시지 표시 안 함 (사용자가 다음 탭을 기다릴 수 있도록)
         }
         if (mounted)
           setState(() {
             _tapTimestamps.clear();
-          });
+          }); // 타임아웃 시 초기화
       });
     }
     if (mounted) setState(() {});
