@@ -135,16 +135,95 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _beatHighlighter = false;
 
   final List<Song> _songList = const [
-    Song(filePath: 'assets/audio/se0101.mp3', title: '논삶는소리 (강원 홍천군)', bpm: 60),
+    // 현대 노동요
     Song(
-      filePath: 'assets/audio/se0102.mp3',
+      filePath: 'assets/audio/emart_original.mp3',
+      title: '이마트 로고송',
+      bpm: 125,
+    ), // BPM은 예시
+    // CD-01
+    Song(
+      filePath: 'assets/audio/CD01-01.mp3',
+      title: '논삶는소리 (강원 홍천군)',
+      bpm: 60,
+    ),
+    Song(
+      filePath: 'assets/audio/CD01-02.mp3',
       title: '논고르는소리 (제주 서귀포시)',
+      bpm: 70,
+    ),
+    Song(
+      filePath: 'assets/audio/CD01-03.mp3',
+      title: '모찌는소리-"얼른 하더니 한 춤" (강원 양양군)',
+      bpm: 110,
+    ),
+    Song(
+      filePath: 'assets/audio/CD01-04.mp3',
+      title: '모찌는소리-"뭉치세 제치세" (충북 진천군)',
+      bpm: 115,
+    ),
+    // CD-02
+    Song(
+      filePath: 'assets/audio/CD02-01.mp3',
+      title: '논매는소리-"헤헤 곯었네" (경기 안성군)',
+      bpm: 80,
+    ),
+    Song(
+      filePath: 'assets/audio/CD02-02.mp3',
+      title: '논매는소리-대허리 (경기 이천군)',
+      bpm: 85,
+    ),
+    Song(
+      filePath: 'assets/audio/CD02-03.mp3',
+      title: '논매는소리-오독떼기 (강원 양양군)',
       bpm: 90,
     ),
     Song(
-      filePath: 'assets/audio/se0103.mp3',
-      title: '모찌는소리 - 얼른 하더니 한 춤 (강원 양양군)',
-      bpm: 120,
+      filePath: 'assets/audio/CD02-04.mp3',
+      title: '논매는소리-"얼카 덩어리" (충남 홍성군)',
+      bpm: 95,
+    ),
+    // CD-03
+    Song(
+      filePath: 'assets/audio/CD03-01.mp3',
+      title: '논매는소리-긴소리/들래기소리 (전남 무안군)',
+      bpm: 75,
+    ),
+    Song(
+      filePath: 'assets/audio/CD03-02.mp3',
+      title: '논매는소리-소오니소리 (경북 구미시)',
+      bpm: 80,
+    ),
+    Song(
+      filePath: 'assets/audio/CD03-03.mp3',
+      title: '논매는소리 (경북 예천군)',
+      bpm: 85,
+    ),
+    Song(
+      filePath: 'assets/audio/CD03-04.mp3',
+      title: '농사장원례소리-애롱대롱 (전남 나주군)',
+      bpm: 100,
+    ),
+    // CD-04
+    Song(
+      filePath: 'assets/audio/CD04-01.mp3',
+      title: '밭가는소리 (강원 홍천군)',
+      bpm: 65,
+    ),
+    Song(
+      filePath: 'assets/audio/CD04-02.mp3',
+      title: '밭일구는소리(따비질) (제주 북제주군)',
+      bpm: 70,
+    ),
+    Song(
+      filePath: 'assets/audio/CD04-03.mp3',
+      title: '밭고르는소리(곰방메질) (제주 북제주군)',
+      bpm: 75,
+    ),
+    Song(
+      filePath: 'assets/audio/CD04-04.mp3',
+      title: '밭밟는소리 (제주 북제주군)',
+      bpm: 80,
     ),
   ];
   late Song _selectedSong;
@@ -164,11 +243,18 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _selectedSong = _songList.first;
+    // _songList가 비어있지 않다고 가정하고 first를 사용
+    _selectedSong =
+        _songList.isNotEmpty
+            ? _songList.first
+            : const Song(filePath: '', title: '노래 없음', bpm: 0);
     _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
     _audioPlayer = AudioPlayer();
     _metronomePlayer = AudioPlayer();
-    _initAudioPlayers(); // 내부에서 _isLoadingSong = false 처리
+    if (_selectedSong.filePath.isNotEmpty) {
+      // 선택된 곡이 있을 때만 초기화
+      _initAudioPlayers();
+    }
     _updateTimerText();
   }
 
