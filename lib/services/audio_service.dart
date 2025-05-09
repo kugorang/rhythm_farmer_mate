@@ -39,6 +39,15 @@ class AudioService {
     _metronomePlayer = AudioPlayer();
     _isDisposed = false; // 초기화 시 false로 설정
 
+    // 메트로놈 플레이어 루프 모드 설정
+    _metronomePlayer.setLoopMode(LoopMode.one);
+
+    // 메트로놈 음원 로드 (앱 시작 시 한 번만)
+    _metronomePlayer.setAsset('assets/audio/tick.mp3').catchError((e) {
+      if (!_isDisposed) debugPrint('초기 메트로놈 음원 로드 실패: $e');
+      // 여기서 사용자에게 오류를 알릴 필요는 없을 수 있음. 재생 시점에 다시 시도.
+    });
+
     // 재생 상태 리스너 설정
     _audioPlayer.playingStream.listen((isPlaying) {
       if (onPlayingStateChanged != null) {
@@ -109,7 +118,7 @@ class AudioService {
     }
     final beatInterval = Duration(milliseconds: beatIntervalMs);
 
-    bool visualBeatState = false; // 첫 handleBeat 호출 시 true로 바뀜
+    bool visualBeatState = false;
 
     void handleBeat() {
       if (_isDisposed) return;
@@ -119,18 +128,25 @@ class AudioService {
         onMetronomeTick!(visualBeatState);
       }
 
-      // 메트로놈 소리는 visualBeatState와 관계없이 매 비트마다 재생
-      if (_isMetronomeSoundEnabled &&
-          (_metronomePlayer.processingState == ProcessingState.ready ||
-              _metronomePlayer.processingState == ProcessingState.completed)) {
-        _metronomePlayer
-            .seek(Duration.zero)
-            .then((_) {
-              if (!_isDisposed) _metronomePlayer.play();
-            })
-            .catchError((e) {
-              if (!_isDisposed) debugPrint('메트로놈 소리 재생 오류: $e');
-            });
+      if (_isMetronomeSoundEnabled) {
+        if (_metronomePlayer.processingState == ProcessingState.ready ||
+            _metronomePlayer.processingState == ProcessingState.completed) {
+          // LoopMode.one을 사용하므로 seek(0)은 필요 없고, play만 호출
+          _metronomePlayer.play().catchError((e) {
+            if (!_isDisposed) debugPrint('메트로놈 소리 재생 오류: $e');
+          });
+        } else if (_metronomePlayer.processingState == ProcessingState.idle ||
+            _metronomePlayer.processingState == null) {
+          // 로드 안된 경우 대비
+          _metronomePlayer
+              .setAsset('assets/audio/tick.mp3')
+              .then((_) {
+                if (!_isDisposed) _metronomePlayer.play();
+              })
+              .catchError((e) {
+                if (!_isDisposed) debugPrint('메트로놈 재생 중 음원 로드 실패: $e');
+              });
+        }
       }
     }
 
@@ -149,8 +165,12 @@ class AudioService {
   // BPM 타이커 중지
   void stopBpmTicker() {
     _bpmTimer?.cancel();
-    if (!_isDisposed && onMetronomeTick != null) {
-      onMetronomeTick!(false);
+    if (!_isDisposed) {
+      _metronomePlayer.pause(); // 루프 모드이므로 pause 후 seek(0)
+      _metronomePlayer.seek(Duration.zero);
+      if (onMetronomeTick != null) {
+        onMetronomeTick!(false);
+      }
     }
   }
 
