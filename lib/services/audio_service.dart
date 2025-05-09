@@ -135,8 +135,7 @@ class AudioService {
           _metronomePlayer.play().catchError((e) {
             if (!_isDisposed) debugPrint('메트로놈 소리 재생 오류: $e');
           });
-        } else if (_metronomePlayer.processingState == ProcessingState.idle ||
-            _metronomePlayer.processingState == null) {
+        } else if (_metronomePlayer.processingState == ProcessingState.idle) {
           // 로드 안된 경우 대비
           _metronomePlayer
               .setAsset('assets/audio/tick.mp3')
@@ -203,14 +202,14 @@ class AudioService {
   Future<void> loadSong(Song song, BuildContext? context) async {
     try {
       final songAsset = song.filePath;
-      if (songAsset.isEmpty) {
+      if (songAsset?.isEmpty ?? true) {
         if (onError != null) {
           onError!('음악 파일 경로가 없습니다.');
         }
         return;
       }
 
-      await _audioPlayer.setAsset(songAsset);
+      await _audioPlayer.setAsset(songAsset!);
       debugPrint('오디오 로드 성공: ${song.title}');
 
       if (_metronomePlayer.processingState == ProcessingState.idle) {
