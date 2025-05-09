@@ -32,6 +32,7 @@ dependencies:
     sdk: flutter
   just_audio: ^0.10.2
   file_picker: ^8.0.5
+  youtube_player_iframe: ^5.1.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
