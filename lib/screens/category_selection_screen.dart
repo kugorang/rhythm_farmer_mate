@@ -310,7 +310,13 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
   }
 
   Widget _buildPlayModeToggle(Song song) {
+    // song 파라미터는 이제 개별 곡 모드 설정에만 사용하거나, 목록 전체 모드 설정 UI에서는 사용 안 함
+    // 여기서는 UI 일관성을 위해 일단 유지하고, 전체/랜덤 모드는 별도 처리 가정
     PlayMode currentMode = _songPlayModes[song.title] ?? _defaultPlayMode;
+
+    // 전체/랜덤 재생은 현재 선택된 displayedSongs 목록에 대한 의미로 가정
+    // UI에서는 현재 곡 옆에 표시되지만, 실제 동작은 목록 단위가 될 수 있음
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -323,7 +329,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                 currentMode == PlayMode.repeat
                     ? Theme.of(context).colorScheme.primary
                     : Colors.grey,
-            size: 22,
+            size: 20,
           ),
           tooltip: '한 곡 반복',
           onPressed: () {
@@ -332,7 +338,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
             });
           },
         ),
-        const SizedBox(width: 4),
         IconButton(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
@@ -342,12 +347,56 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                 currentMode == PlayMode.normal
                     ? Theme.of(context).colorScheme.primary
                     : Colors.grey,
-            size: 22,
+            size: 20,
           ),
-          tooltip: '일반 재생 (다음 곡 없음)',
+          tooltip: '일반 재생',
           onPressed: () {
             setState(() {
               _songPlayModes[song.title] = PlayMode.normal;
+            });
+          },
+        ),
+        // 전체 재생 버튼 (현재 목록 기준)
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          icon: Icon(
+            Icons.repeat,
+            color:
+                currentMode == PlayMode.allSongs
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey,
+            size: 20,
+          ),
+          tooltip: '목록 전체 반복 재생',
+          onPressed: () {
+            // 이 모드는 특정 곡이 아닌, 목록 전체에 대한 설정으로 간주.
+            // UI상으로는 각 곡 옆에 있지만, 선택 시 전체 목록 재생 모드로 상태 변경 필요.
+            // 예를 들어, _selectedOverallPlayMode 같은 변수를 두고 업데이트.
+            // 여기서는 일단 각 곡의 PlayMode를 allSongs로 설정하는 것으로 단순화.
+            setState(() {
+              _songPlayModes[song.title] = PlayMode.allSongs;
+              // 또는 별도의 상태 변수 _overallPlayMode = PlayMode.allSongs; 업데이트
+            });
+          },
+        ),
+        // 랜덤 재생 버튼 (현재 목록 기준)
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          icon: Icon(
+            Icons.shuffle,
+            color:
+                currentMode == PlayMode.shuffle
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey,
+            size: 20,
+          ),
+          tooltip: '목록 랜덤 재생',
+          onPressed: () {
+            setState(() {
+              _songPlayModes[song.title] = PlayMode.shuffle;
+              // 또는 _overallPlayMode = PlayMode.shuffle;
             });
           },
         ),

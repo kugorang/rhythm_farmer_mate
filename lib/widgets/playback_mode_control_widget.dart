@@ -24,6 +24,10 @@ class PlaybackModeControlWidget extends StatelessWidget {
           return Icons.play_arrow;
         case PlayMode.repeat:
           return Icons.repeat_one;
+        case PlayMode.allSongs:
+          return Icons.repeat;
+        case PlayMode.shuffle:
+          return Icons.shuffle;
       }
       return Icons.play_arrow;
     }
@@ -34,14 +38,16 @@ class PlaybackModeControlWidget extends StatelessWidget {
           return '일반 재생';
         case PlayMode.repeat:
           return '한 곡 반복';
+        case PlayMode.allSongs:
+          return '목록 전체 재생';
+        case PlayMode.shuffle:
+          return '목록 랜덤 재생';
       }
       return '일반 재생';
     }
 
     final currentModeIcon = getModeIcon(currentPlayMode);
     final currentModeText = getModeText(currentPlayMode);
-
-    final List<PlayMode> availableModes = [PlayMode.normal, PlayMode.repeat];
 
     return Card(
       color: theme.colorScheme.card,
@@ -80,7 +86,7 @@ class PlaybackModeControlWidget extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final mode in availableModes)
+                    for (final mode in PlayMode.values)
                       Padding(
                         padding: const EdgeInsets.only(left: 2),
                         child: IconButton(

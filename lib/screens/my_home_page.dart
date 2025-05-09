@@ -14,11 +14,14 @@ import '../services/bpm_service.dart';
 import '../services/challenge_service.dart';
 import '../widgets/pomodoro_control_button_widget.dart'
     show PomodoroState, PomodoroControlButtonWidget; // PomodoroState 임포트 확인
+import '../widgets/playlist_dialog_widget.dart'; // 새로 추가된 위젯
 
 // 재생 모드 정의
 enum PlayMode {
   normal, // 기본 재생 (한 곡 재생 후 정지)
   repeat, // 한 곡 반복 재생
+  allSongs, // 전체 목록 순차 재생 (추가)
+  shuffle, // 랜덤 재생 (추가)
 }
 
 // enum PomodoroState { // 이 부분을 주석 처리 또는 삭제
@@ -30,11 +33,13 @@ enum PlayMode {
 class MyHomePage extends StatefulWidget {
   final Song selectedSong;
   final PlayMode initialPlayMode;
+  final List<Song>? songList;
 
   const MyHomePage({
     super.key,
     required this.selectedSong,
     this.initialPlayMode = PlayMode.normal,
+    this.songList,
   });
 
   @override
@@ -58,12 +63,14 @@ class _MyHomePageState extends State<MyHomePage> {
   // 재생 모드 상태 변수
   late PlayMode _playMode;
   final Random _random = Random();
-  late Song _currentSelectedSong; // initState에서 widget.selectedSong으로 초기화
+  late Song _currentSelectedSong;
+  late List<Song> _currentPlaylist;
+  int _currentSongIndex = 0;
   late int _currentManualBpm;
   double _currentPlaybackSpeed = 1.0;
   bool _isYoutubePlaying = false; // 유튜브 재생 상태 관찰용 (YoutubeValueBuilder에서 업데이트)
   Duration _youtubeDuration =
-      Duration.zero; // 유튜브 영상 길이 (YoutubeValueBuilder에서 업데이트)
+      Duration.zero; // 유트브 영상 길이 (YoutubeValueBuilder에서 업데이트)
 
   static const int slowBpm = 60;
   static const int normalBpm = 90;
@@ -87,8 +94,34 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _currentSelectedSong = widget.selectedSong;
     _playMode = widget.initialPlayMode;
+    // songList가 null이거나 비어있으면 selectedSong만 포함하는 리스트로 초기화
+    _currentPlaylist =
+        (widget.songList != null && widget.songList!.isNotEmpty)
+            ? List.from(widget.songList!)
+            : [widget.selectedSong];
+
+    if (_currentPlaylist.isEmpty) {
+      // 이 경우는 selectedSong도 없다는 의미이므로, 이전 화면으로 이동 등의 예외 처리
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
+    if (_playMode == PlayMode.shuffle) {
+      _currentSongIndex = _random.nextInt(_currentPlaylist.length);
+    } else {
+      _currentSongIndex = _currentPlaylist.indexOf(widget.selectedSong);
+      if (_currentSongIndex == -1) {
+        // selectedSong이 songList에 없는 예외적인 경우
+        _currentSelectedSong = widget.selectedSong; // 직접 할당
+        _currentPlaylist = [widget.selectedSong]; // 플레이리스트도 현재 곡 하나로 강제
+        _currentSongIndex = 0;
+      } else {
+        _currentSelectedSong = _currentPlaylist[_currentSongIndex];
+      }
+    }
+    // _currentSelectedSong = _currentPlaylist[_currentSongIndex]; // 위에서 이미 할당됨
+
     _currentManualBpm =
         _currentSelectedSong.bpm > 0 ? _currentSelectedSong.bpm : 90;
     _audioService = AudioService();
@@ -312,7 +345,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBarWidget(
         title: _currentSelectedSong.title,
-        onPlaylistPressed: _showCurrentSongInfoDialog,
+        onPlaylistPressed: _showPlaylistDialog,
       ),
       body: Center(
         child: ConstrainedBox(
@@ -426,11 +459,88 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _handleYouTubeVideoEnded() {
-    if (_playMode == PlayMode.repeat &&
-        _pomodoroState == PomodoroState.stopped) {
-      _youtubeController?.seekTo(seconds: 0);
-      _youtubeController?.playVideo();
+    if (_pomodoroState == PomodoroState.stopped) {
+      _playNextSong();
     }
+  }
+
+  void _handleLocalAudioCompletion() {
+    if (_currentSelectedSong.filePath != null &&
+        _pomodoroState == PomodoroState.stopped) {
+      _playNextSong();
+    }
+  }
+
+  void _playNextSong() {
+    if (_currentPlaylist.isEmpty) return;
+
+    if (_playMode == PlayMode.repeat) {
+      if (_isYoutubeMode && _youtubeController != null) {
+        _youtubeController!.seekTo(seconds: 0);
+        _youtubeController!.playVideo();
+      } else if (!_isYoutubeMode) {
+        _audioService.seek(Duration.zero);
+        _audioService.play();
+      }
+      return;
+    }
+
+    // 일반 모드(normal)이고 곡이 하나뿐이거나, 현재 곡이 목록의 마지막 곡일 경우 더 이상 진행 안 함 (allSongs가 아닐 때)
+    if (_playMode == PlayMode.normal &&
+        (_currentPlaylist.length <= 1 ||
+            _currentSongIndex >= _currentPlaylist.length - 1)) {
+      // 재생 중지 또는 사용자의 다음 행동 대기 (예: 음악 정지)
+      if (_isYoutubeMode && _youtubeController != null && _isYoutubePlaying)
+        _youtubeController!.pauseVideo();
+      else if (!_isYoutubeMode && _audioService.isPlaying)
+        _audioService.pause();
+      return;
+    }
+
+    if (_playMode == PlayMode.shuffle) {
+      if (_currentPlaylist.length > 1) {
+        // 곡이 2개 이상일 때만 다른 곡 랜덤 선택
+        int previousIndex = _currentSongIndex;
+        do {
+          _currentSongIndex = _random.nextInt(_currentPlaylist.length);
+        } while (_currentSongIndex == previousIndex);
+      } else {
+        // 곡이 하나면 그냥 그 곡 다시 (또는 아무것도 안 함)
+        _currentSongIndex = 0;
+      }
+    } else {
+      // PlayMode.normal (곡 여러 개) 또는 PlayMode.allSongs
+      _currentSongIndex = (_currentSongIndex + 1) % _currentPlaylist.length;
+    }
+
+    _changeToSongAtIndex(_currentSongIndex);
+  }
+
+  void _changeToSongAtIndex(int index) {
+    if (index < 0 || index >= _currentPlaylist.length) return;
+
+    // 기존 오디오/비디오 정지
+    if (_isYoutubeMode && _youtubeController != null) {
+      _youtubeController!.stopVideo();
+    } else if (!_isYoutubeMode) {
+      _audioService.stop();
+    }
+
+    // 다음 곡으로 상태 업데이트
+    setState(() {
+      _currentSongIndex = index;
+      _currentSelectedSong = _currentPlaylist[index];
+      _isLoadingSong = true;
+      _currentManualBpm =
+          _currentSelectedSong.bpm > 0 ? _currentSelectedSong.bpm : 90;
+      _youtubeDuration = Duration.zero;
+      _remainingTime = Duration.zero;
+      _progressPercent = 0.0;
+      _updateTimerText();
+      // _isYoutubePlaying = false; // _initAudio에서 처리됨
+      // _audioService.isPlaying는 AudioService 내부 상태
+    });
+    _initAudio();
   }
 
   void _startNextPomodoroPhase() {
@@ -606,45 +716,27 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void _showCurrentSongInfoDialog() {
-    showShadDialog(
+  void _showPlaylistDialog() {
+    showDialog(
       context: context,
-      builder: (context) {
-        final theme = ShadTheme.of(context);
-        return ShadDialog(
-          title: Text(_currentSelectedSong.title, style: theme.textTheme.h4),
-          description: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'BPM: ${_currentSelectedSong.bpm}',
-                style: theme.textTheme.p,
-              ),
-              Text(
-                '카테고리: ${_currentSelectedSong.categoryType.name}',
-                style: theme.textTheme.p,
-              ),
-              if (_currentSelectedSong.subCategory != null &&
-                  _currentSelectedSong.subCategory!.isNotEmpty)
-                Text(
-                  '하위 카테고리: ${_currentSelectedSong.subCategory!}',
-                  style: theme.textTheme.p,
-                ),
-              if (_currentSelectedSong.filePath != null)
-                Text('타입: 로컬 파일', style: theme.textTheme.p),
-              if (_currentSelectedSong.youtubeVideoId != null)
-                Text('타입: YouTube', style: theme.textTheme.p),
-            ],
+      builder:
+          (context) => PlaylistDialogWidget(
+            songList: _currentPlaylist, // 현재 전체 재생 목록 전달
+            currentSelectedSong: _currentSelectedSong,
+            currentPlayMode: _playMode, // 현재 전체 재생 모드 전달
+            onSongSelected: (song) {
+              Navigator.of(context).pop();
+              int songIndex = _currentPlaylist.indexOf(song);
+              if (songIndex != -1) {
+                _changeToSongAtIndex(songIndex);
+              }
+            },
+            onOverallPlayModeChanged: (newMode) {
+              Navigator.of(context).pop();
+              // 전체 재생 모드 변경 로직 (MyHomePage의 _playMode 상태 업데이트)
+              _changePlayMode(newMode); // _changePlayMode는 내부적으로 setState 호출
+            },
           ),
-          actions: [
-            ShadButton(
-              child: const Text('닫기'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -688,7 +780,7 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
         if (onPlaylistPressed != null)
           ShadButton.ghost(
             icon: Icon(
-              Icons.info_outline_rounded,
+              Icons.queue_music_rounded,
               color: theme.colorScheme.primaryForeground,
             ),
             onPressed: onPlaylistPressed,

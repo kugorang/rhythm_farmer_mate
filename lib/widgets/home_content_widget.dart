@@ -5,13 +5,13 @@ import '../models/song_category.dart'; // SongCategoryType을 사용하기 위�
 // import '../screens/my_home_page.dart'
 //     show PlayMode; // MyHomePageState의 public 메서드/변수 접근을 위해
 import './timer_display_widget.dart';
-import './speed_control_section_widget.dart';
+import 'package:rhythm_farmer_mate/widgets/speed_control_section_widget.dart';
 import './progress_display_widget.dart';
 import './music_control_widget.dart';
 // import './challenge_control_button_widget.dart'; // 사용 안 함
-import '../screens/my_home_page.dart'
+import 'package:rhythm_farmer_mate/screens/my_home_page.dart'
     show PomodoroState; // PomodoroState enum 가져오기
-import './pomodoro_control_button_widget.dart'
+import 'package:rhythm_farmer_mate/widgets/pomodoro_control_button_widget.dart'
     show PomodoroState, PomodoroControlButtonWidget; // PomodoroState와 위젯 모두 가져옴
 // import './song_selection_widget.dart';
 // import './playback_mode_control_widget.dart';
