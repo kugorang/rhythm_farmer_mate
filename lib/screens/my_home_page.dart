@@ -29,6 +29,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double _progressPercent = 0.0;
   Timer? _bpmTimer;
   bool _beatHighlighter = false;
+  bool _isMetronomeSoundEnabled = true; // 메트로놈 소리 활성화 여부 상태
 
   static const int slowBpm = 60;
   static const int normalBpm = 90;
@@ -387,8 +388,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _restartBpmTimer() {
     _bpmTimer?.cancel();
     if (!mounted) return;
-    // 챌린지 중이거나, (챌린지 중이 아니면서) 음악만 재생 중일 때 BPM 타이머(시각화) 활성화
-    if (_isChallengeRunning || (_isPlaying && !_isChallengeRunning)) {
+    if (_isChallengeRunning || _isPlaying) {
       final songBpm = _currentManualBpm > 0 ? _currentManualBpm : 60;
       final beatInterval = (60000 / songBpm).round();
       if (beatInterval <= 0) {
@@ -403,8 +403,9 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _beatHighlighter = !_beatHighlighter;
         });
-        // 메트로놈 오디오 재생 로직 (계속 주석 처리)
-        /* if ((_isChallengeRunning || _isPlaying) && mounted && _metronomePlayer.processingState != ProcessingState.loading) { ... } */
+        // if (_isMetronomeSoundEnabled && (_isChallengeRunning || _isPlaying) && mounted && _metronomePlayer.processingState != ProcessingState.loading) {
+        //   // 메트로놈 오디오 재생 로직 (현재 주석 처리)
+        // }
       });
     } else {
       if (mounted) setState(() => _beatHighlighter = false);
@@ -608,6 +609,50 @@ class _MyHomePageState extends State<MyHomePage> {
     // _isPlaying 상태는 _audioPlayer.playingStream.listen 에 의해 업데이트됨
   }
 
+  Future<void> _showMetronomeSettingsDialog() async {
+    final theme = ShadTheme.of(context);
+    return showShadDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return ShadDialog(
+              title: const Text('메트로놈 설정'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Text('메트로놈 소리 켜기', style: theme.textTheme.p),
+                    ShadSwitch(
+                      value: _isMetronomeSoundEnabled,
+                      onChanged: (bool value) {
+                        setDialogState(() {
+                          _isMetronomeSoundEnabled = value;
+                        });
+                        setState(() {
+                          _isMetronomeSoundEnabled = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                ShadButton.ghost(
+                  child: const Text('닫기'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -647,6 +692,15 @@ class _MyHomePageState extends State<MyHomePage> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          ShadButton.ghost(
+            icon: Icon(
+              Icons.music_note_outlined,
+              color: theme.colorScheme.primaryForeground,
+            ),
+            onPressed: _showMetronomeSettingsDialog, // 설정 다이얼로그 호출
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
