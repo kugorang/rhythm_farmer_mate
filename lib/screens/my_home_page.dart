@@ -7,6 +7,7 @@ import '../widgets/timer_display_widget.dart'; // 상대 경로
 import '../widgets/bpm_control_section_widget.dart'; // 상대 경로
 import '../widgets/music_control_widget.dart'; // 상대 경로
 import '../widgets/progress_display_widget.dart'; // ProgressDisplayWidget import 추가
+import '../widgets/challenge_control_button_widget.dart'; // ChallengeControlButtonWidget import 추가
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -747,42 +748,27 @@ class _MyHomePageState extends State<MyHomePage> {
                       onStop: _handleStop,
                     ),
                     const SizedBox(height: 30),
-                    ShadButton(
-                      size: ShadButtonSize.lg,
-                      onPressed:
-                          _isLoadingSong
-                              ? null
-                              : () {
-                                if (_isChallengeRunning) {
-                                  _stopChallenge();
-                                } else {
-                                  if (_audioDuration == null) {
-                                    if (mounted) {
-                                      ShadToaster.of(context).show(
-                                        ShadToast(
-                                          title: const Text('오류'),
-                                          description: const Text(
-                                            '음악 정보를 로드 중입니다.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    return;
-                                  }
-                                  _startChallenge(); // _startChallenge 내부에서 _remainingTime 및 _progressPercent 초기화
-                                }
-                              },
-                      child: Text(
-                        _isLoadingSong
-                            ? '노래 로딩 중...'
-                            : (_isChallengeRunning ? '작업 중지' : '작업 시작'),
-                        style: theme.textTheme.large.copyWith(
-                          color:
-                              _isChallengeRunning
-                                  ? theme.colorScheme.destructiveForeground
-                                  : theme.colorScheme.primaryForeground,
-                        ),
-                      ),
+                    ChallengeControlButtonWidget(
+                      isLoadingSong: _isLoadingSong,
+                      isChallengeRunning: _isChallengeRunning,
+                      onPressed: () {
+                        if (_isChallengeRunning) {
+                          _stopChallenge();
+                        } else {
+                          if (_audioDuration == null) {
+                            if (mounted) {
+                              ShadToaster.of(context).show(
+                                ShadToast(
+                                  title: const Text('오류'),
+                                  description: const Text('음악 정보를 로드 중입니다.'),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          _startChallenge();
+                        }
+                      },
                     ),
                   ],
                 ),
