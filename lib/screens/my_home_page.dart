@@ -485,32 +485,30 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
 
-    // 일반 모드(normal)이고 곡이 하나뿐이거나, 현재 곡이 목록의 마지막 곡일 경우 더 이상 진행 안 함 (allSongs가 아닐 때)
-    if (_playMode == PlayMode.normal &&
-        (_currentPlaylist.length <= 1 ||
-            _currentSongIndex >= _currentPlaylist.length - 1)) {
-      // 재생 중지 또는 사용자의 다음 행동 대기 (예: 음악 정지)
-      if (_isYoutubeMode && _youtubeController != null && _isYoutubePlaying)
-        _youtubeController!.pauseVideo();
-      else if (!_isYoutubeMode && _audioService.isPlaying)
-        _audioService.pause();
-      return;
-    }
-
-    if (_playMode == PlayMode.shuffle) {
+    if (_playMode == PlayMode.normal) {
+      // 일반 모드에서는 현재 곡이 마지막 곡이거나 유일한 곡이면 재생 중지
+      if (_currentPlaylist.length <= 1 ||
+          _currentSongIndex >= _currentPlaylist.length - 1) {
+        if (_isYoutubeMode && _youtubeController != null && _isYoutubePlaying)
+          _youtubeController!.pauseVideo();
+        else if (!_isYoutubeMode && _audioService.isPlaying)
+          _audioService.pause();
+        // 필요하다면 _pomodoroState를 PomodoroState.stopped로 변경하는 로직 추가
+        return;
+      }
+      // 마지막 곡이 아니면 다음 곡으로
+      _currentSongIndex = (_currentSongIndex + 1) % _currentPlaylist.length;
+    } else if (_playMode == PlayMode.allSongs) {
+      _currentSongIndex = (_currentSongIndex + 1) % _currentPlaylist.length;
+    } else if (_playMode == PlayMode.shuffle) {
       if (_currentPlaylist.length > 1) {
-        // 곡이 2개 이상일 때만 다른 곡 랜덤 선택
         int previousIndex = _currentSongIndex;
         do {
           _currentSongIndex = _random.nextInt(_currentPlaylist.length);
         } while (_currentSongIndex == previousIndex);
       } else {
-        // 곡이 하나면 그냥 그 곡 다시 (또는 아무것도 안 함)
         _currentSongIndex = 0;
       }
-    } else {
-      // PlayMode.normal (곡 여러 개) 또는 PlayMode.allSongs
-      _currentSongIndex = (_currentSongIndex + 1) % _currentPlaylist.length;
     }
 
     _changeToSongAtIndex(_currentSongIndex);
@@ -744,15 +742,18 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _playMode = mode;
     });
-    if (!_isYoutubeMode &&
-        _audioService.isPlaying &&
-        _playMode == PlayMode.repeat) {
-      // _audioService.setLoopMode(LoopMode.one); // just_audio의 경우
-    } else if (!_isYoutubeMode &&
-        _audioService.isPlaying &&
-        _playMode == PlayMode.normal) {
-      // _audioService.setLoopMode(LoopMode.off);
+    if (!_isYoutubeMode) {
+      _audioService.setLoopMode(
+        mode == PlayMode.repeat
+            ? just_audio.LoopMode.one
+            : just_audio.LoopMode.off,
+      );
+    } else {
+      // YouTube의 경우, PlayMode.repeat는 _handleYouTubeVideoEnded에서 이미 처리 중.
+      // PlayMode.allSongs나 PlayMode.shuffle은 _playNextSong 로직에 따름.
     }
+    // 현재 재생 중인 곡에 새 모드를 바로 적용할지 여부 (예: allSongs로 바꾸면 바로 다음 곡 준비?)
+    // 여기서는 다음 곡 재생 시점에 새 모드가 적용되도록 함.
   }
 }
 

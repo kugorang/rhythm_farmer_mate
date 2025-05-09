@@ -157,14 +157,19 @@ class AudioService {
   // 재생 속도 설정
   Future<void> setSpeed(double speed) async {
     try {
-      _currentPlaybackSpeed = speed; // 현재 재생 속도 업데이트
+      _currentPlaybackSpeed = speed;
       await _audioPlayer.setSpeed(speed > 0 ? speed : 1.0);
-      // BPM 티커가 실행 중이라면, 속도 변경에 맞춰 재시작
-      // if (_bpmTimer != null && _bpmTimer!.isActive) {
-      //   startBpmTicker(60); // 기본 BPM 60으로 재시작
-      // }
     } catch (e) {
       onError?.call('재생 속도 설정 오류: ${e.toString()}');
+    }
+  }
+
+  // 반복 모드 설정 (추가)
+  Future<void> setLoopMode(LoopMode mode) async {
+    try {
+      await _audioPlayer.setLoopMode(mode);
+    } catch (e) {
+      onError?.call('반복 모드 설정 오류: ${e.toString()}');
     }
   }
 
