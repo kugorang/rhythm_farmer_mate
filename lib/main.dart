@@ -420,7 +420,26 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final defaultBorderRadius = BorderRadius.circular(6.0); // 고정값 사용
+    final defaultBorderRadius = BorderRadius.circular(6.0);
+
+    // BPM 비트에 따른 스케일 값 결정
+    final bpmIndicatorScale = _beatHighlighter ? 1.1 : 1.0;
+    // BPM 비트에 따른 배경색 결정
+    final bpmIndicatorColor =
+        _isLoadingSong
+            ? theme.colorScheme.muted
+            : (_beatHighlighter
+                ? theme.colorScheme.primary.withOpacity(0.3) // 좀 더 강조된 색상
+                : theme.colorScheme.card);
+    // BPM 비트에 따른 텍스트 색상 결정
+    final bpmTextColor =
+        _isLoadingSong
+            ? theme.colorScheme.mutedForeground
+            : (_beatHighlighter
+                ? theme
+                    .colorScheme
+                    .primary // 강조된 텍스트 색상
+                : theme.colorScheme.foreground);
 
     return Scaffold(
       appBar: AppBar(
@@ -534,17 +553,24 @@ class _MyHomePageState extends State<MyHomePage> {
                                   : () => _changeBpm(-5),
                         ),
                         Expanded(
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: Duration(
+                              milliseconds:
+                                  (60000 /
+                                          (_currentManualBpm > 0
+                                              ? _currentManualBpm
+                                              : 60) /
+                                          2)
+                                      .round(),
+                            ), // 비트 간격의 절반으로 애니메이션 속도 설정
                             margin: const EdgeInsets.symmetric(horizontal: 8),
                             height: 52,
+                            transform:
+                                Matrix4.identity()
+                                  ..scale(bpmIndicatorScale), // 스케일 애니메이션 적용
+                            transformAlignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color:
-                                  _isLoadingSong
-                                      ? theme.colorScheme.muted
-                                      : (_beatHighlighter
-                                          ? theme.colorScheme.primary
-                                              .withOpacity(0.2)
-                                          : theme.colorScheme.card),
+                              color: bpmIndicatorColor,
                               borderRadius: defaultBorderRadius,
                               border: Border.all(
                                 color: theme.colorScheme.border,
@@ -563,12 +589,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       : Text(
                                         'BPM: $_currentManualBpm',
                                         style: theme.textTheme.p.copyWith(
-                                          color:
-                                              _beatHighlighter
-                                                  ? theme.colorScheme.primary
-                                                  : theme
-                                                      .colorScheme
-                                                      .foreground,
+                                          color: bpmTextColor,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -631,8 +652,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               padding: const EdgeInsets.only(top: 4.0),
                               child: Text(
                                 _currentPlaybackSpeed == 1.0
-                                    ? "(원곡 속도, BPM: ${_selectedSong.bpm})"
-                                    : '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (BPM: ${_selectedSong.bpm} -> $_currentManualBpm)',
+                                    ? "(원곡 속도, BPM: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'})"
+                                    : '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (BPM: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'} -> $_currentManualBpm)',
                                 style: theme.textTheme.small.copyWith(
                                   color: theme.colorScheme.mutedForeground,
                                 ),
@@ -658,7 +679,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                             _audioPlayer.pause();
                                           else {
                                             _audioPlayer.setSpeed(
-                                              _currentPlaybackSpeed,
+                                              _currentPlaybackSpeed > 0
+                                                  ? _currentPlaybackSpeed
+                                                  : 1.0,
                                             );
                                             _audioPlayer.play();
                                             if (!_isTimerRunning)
