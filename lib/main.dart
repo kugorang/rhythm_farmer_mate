@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:shadcn_ui/shadcn_ui.dart'; // shadcn_ui import
 import 'models/song.dart'; // Song 모델 import
 import 'screens/splash_screen.dart'; // SplashScreen 위젯 import
+import 'widgets/timer_display_widget.dart';
 
 void main() {
   runApp(const MyApp());
@@ -644,7 +645,16 @@ class _MyHomePageState extends State<MyHomePage> {
     // final canControlMusicInChallenge = _isChallengeRunning && !_isLoadingSong && _audioDuration != null; // 챌린지 중 음악 제어 (현재는 작업 시작/중지로 통합)
 
     return Scaffold(
-      appBar: AppBar(/* ... */),
+      appBar: AppBar(
+        backgroundColor: theme.colorScheme.primary,
+        title: Text(
+          '리듬농부 메이트',
+          style: theme.textTheme.h4.copyWith(
+            color: theme.colorScheme.primaryForeground,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -703,33 +713,10 @@ class _MyHomePageState extends State<MyHomePage> {
                           initialValue: _selectedSong,
                         ),
                       ),
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color:
-                            _isLoadingSong
-                                ? theme.colorScheme.muted
-                                : theme.colorScheme.card,
-                        borderRadius: defaultBorderRadius,
-                        border: Border.all(color: theme.colorScheme.border),
-                      ),
-                      child: Center(
-                        child:
-                            _isLoadingSong
-                                ? Text(
-                                  "노래 로딩 중...",
-                                  style: theme.textTheme.h4.copyWith(
-                                    color: theme.colorScheme.mutedForeground,
-                                  ),
-                                )
-                                : Text(
-                                  _timerText,
-                                  style: theme.textTheme.h1.copyWith(
-                                    fontFamily: 'monospace',
-                                    color: theme.colorScheme.foreground,
-                                  ),
-                                ),
-                      ),
+                    TimerDisplayWidget(
+                      isLoadingSong: _isLoadingSong,
+                      timerText: _timerText,
+                      borderRadius: defaultBorderRadius,
                     ),
                     const SizedBox(height: 12),
                     // BPM 프리셋 버튼: 활성화 조건 변경
