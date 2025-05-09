@@ -15,6 +15,7 @@ typedef AudioCompletionCallback = void Function(); // 추가된 완료 콜백 �
 class AudioService {
   late AudioPlayer _audioPlayer;
   late AudioPlayer _metronomePlayer;
+  bool _isDisposed = false; // 서비스 해제 여부 플래그
 
   // 상태 콜백
   AudioPlayerStateCallback? onPlayingStateChanged;
@@ -36,6 +37,7 @@ class AudioService {
   void _initPlayers() {
     _audioPlayer = AudioPlayer();
     _metronomePlayer = AudioPlayer();
+    _isDisposed = false; // 초기화 시 false로 설정
 
     // 재생 상태 리스너 설정
     _audioPlayer.playingStream.listen((isPlaying) {
@@ -89,48 +91,63 @@ class AudioService {
 
   // BPM에 맞춰 메트로놈 시작
   void startBpmTicker(int bpm, {bool forceRestart = false}) {
-    // 기존 타이머 중지
     _bpmTimer?.cancel();
 
-    if (bpm <= 0) {
-      if (onMetronomeTick != null) {
+    if (_isDisposed || bpm <= 0) {
+      if (onMetronomeTick != null && !_isDisposed) {
         onMetronomeTick!(false);
       }
       return;
     }
 
-    // BPM에 맞는 밀리초 간격 계산
-    final beatInterval = (60000 / bpm).round();
+    final beatIntervalMs = (60000 / bpm).round();
+    if (beatIntervalMs <= 0) {
+      if (onMetronomeTick != null && !_isDisposed) {
+        onMetronomeTick!(false);
+      }
+      return;
+    }
+    final beatInterval = Duration(milliseconds: beatIntervalMs);
 
-    bool beatOn = false;
-    _bpmTimer = Timer.periodic(Duration(milliseconds: beatInterval), (timer) {
-      beatOn = !beatOn;
+    bool visualBeatState = false; // 첫 handleBeat 호출 시 true로 바뀜
 
-      // 비트 상태 변경 콜백 호출
+    void handleBeat() {
+      if (_isDisposed) return;
+
+      visualBeatState = !visualBeatState;
       if (onMetronomeTick != null) {
-        onMetronomeTick!(beatOn);
+        onMetronomeTick!(visualBeatState);
       }
 
-      // 소리 활성화된 경우 메트로놈 소리 재생
-      if (beatOn && _isMetronomeSoundEnabled) {
-        // 메트로놈 소리는 비트가 시작될 때만 재생 (beatOn == true)
-        if (_metronomePlayer.processingState == ProcessingState.ready) {
-          try {
-            // 소리 재생 전 위치 초기화
-            _metronomePlayer.seek(Duration.zero);
-            _metronomePlayer.play();
-          } catch (e) {
-            debugPrint('메트로놈 소리 재생 오류: $e');
-          }
-        }
+      if (_isMetronomeSoundEnabled &&
+          _metronomePlayer.processingState == ProcessingState.ready) {
+        _metronomePlayer
+            .seek(Duration.zero)
+            .then((_) {
+              if (!_isDisposed) _metronomePlayer.play();
+            })
+            .catchError((e) {
+              if (!_isDisposed) debugPrint('메트로놈 소리 재생 오류: $e');
+            });
       }
+    }
+
+    // 첫 비트 즉시 실행
+    handleBeat();
+
+    _bpmTimer = Timer.periodic(beatInterval, (timer) {
+      if (_isDisposed) {
+        timer.cancel();
+        return;
+      }
+      handleBeat();
     });
   }
 
   // BPM 타이커 중지
   void stopBpmTicker() {
     _bpmTimer?.cancel();
-    if (onMetronomeTick != null) {
+    if (!_isDisposed && onMetronomeTick != null) {
       onMetronomeTick!(false);
     }
   }
@@ -146,6 +163,7 @@ class AudioService {
 
   // 해제
   void dispose() {
+    _isDisposed = true; // 해제됨으로 표시
     _bpmTimer?.cancel();
     _audioPlayer.dispose();
     _metronomePlayer.dispose();
