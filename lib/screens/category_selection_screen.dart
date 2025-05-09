@@ -17,7 +17,7 @@ class CategorySelectionScreen extends StatefulWidget {
 }
 
 class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
-  List<Song> _userRegisteredSongs = [];
+  final List<Song> _userRegisteredSongs = [];
   final _youtubeUrlController = TextEditingController();
 
   Future<void> _showAddSongDialog() async {
@@ -26,6 +26,14 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
       builder: (BuildContext context) {
         return ShadDialog(
           title: const Text('내 노래 추가 방식 선택'),
+          actions: <Widget>[
+            ShadButton.ghost(
+              child: const Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -48,14 +56,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
               ),
             ],
           ),
-          actions: <Widget>[
-            ShadButton.ghost(
-              child: const Text('취소'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
         );
       },
     );
@@ -68,12 +68,6 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
       builder: (BuildContext context) {
         return ShadDialog(
           title: const Text('YouTube URL 입력'),
-          child: ShadInput(
-            controller: _youtubeUrlController,
-            placeholder: const Text(
-              '예: https://www.youtube.com/watch?v=VIDEO_ID',
-            ),
-          ),
           actions: <Widget>[
             ShadButton.ghost(
               child: const Text('취소'),
@@ -112,6 +106,12 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
               },
             ),
           ],
+          child: ShadInput(
+            controller: _youtubeUrlController,
+            placeholder: const Text(
+              '예: https://www.youtube.com/watch?v=VIDEO_ID',
+            ),
+          ),
         );
       },
     );

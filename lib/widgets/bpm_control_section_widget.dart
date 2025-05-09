@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../models/song.dart'; // Song 모델 필요 시 (현재는 BPM 값만 받음)
+// Song 모델 필요 시 (현재는 BPM 값만 받음)
 
 class BpmControlSectionWidget extends StatelessWidget {
   final bool isLoadingSong;

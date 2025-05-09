@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart'; // AudioPlayer 상태 접근 위해 필요할 수 있음
+// AudioPlayer 상태 접근 위해 필요할 수 있음
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../models/song.dart'; // Song 모델
 

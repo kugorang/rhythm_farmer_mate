@@ -19,17 +19,15 @@ class ProgressDisplayWidget extends StatelessWidget {
     return Column(
       children: [
         ShadProgress(
-          value:
-              isLoadingSong
-                  ? 0
-                  : (isChallengeRunning ? progressPercent * 100 : 0),
+          value: isLoadingSong ? 0 : progressPercent * 100,
           minHeight: 12,
           color: theme.colorScheme.primary,
           backgroundColor: theme.colorScheme.muted,
         ),
         const SizedBox(height: 12),
         Visibility(
-          visible: !isLoadingSong && isChallengeRunning,
+          visible:
+              !isLoadingSong && (isChallengeRunning || progressPercent > 0),
           maintainSize: true,
           maintainAnimation: true,
           maintainState: true,
