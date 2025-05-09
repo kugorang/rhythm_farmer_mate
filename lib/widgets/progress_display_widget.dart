@@ -28,15 +28,17 @@ class ProgressDisplayWidget extends StatelessWidget {
           backgroundColor: theme.colorScheme.muted,
         ),
         const SizedBox(height: 12),
-        Center(
-          child: Text(
-            isLoadingSong
-                ? '로딩 중...'
-                : (isChallengeRunning
-                    ? '진행도: ${(progressPercent * 100).toStringAsFixed(0)}%'
-                    : '대기 중'),
-            style: theme.textTheme.small.copyWith(
-              color: theme.colorScheme.mutedForeground,
+        Visibility(
+          visible: !isLoadingSong && isChallengeRunning,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: Center(
+            child: Text(
+              '진행도: ${(progressPercent * 100).toStringAsFixed(0)}%',
+              style: theme.textTheme.small.copyWith(
+                color: theme.colorScheme.mutedForeground,
+              ),
             ),
           ),
         ),

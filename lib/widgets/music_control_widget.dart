@@ -36,26 +36,25 @@ class MusicControlWidget extends StatelessWidget {
     final canControlMusicIndependently =
         !isChallengeRunning && !isLoadingSong && audioDuration != null;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color:
-            (isLoadingSong ||
-                    (isChallengeRunning &&
-                        !isPlaying)) // 챌린지 중 음악이 꺼져있을 때도 muted
-                ? theme.colorScheme.muted.withOpacity(0.5)
-                : theme.colorScheme.card,
-        borderRadius: defaultBorderRadius,
-        border: Border.all(color: theme.colorScheme.border),
-      ),
-      child: Column(
-        children: [
-          Text(
-            isLoadingSong ? '로딩 중...' : '현재 재생 중: ${selectedSong.title}',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.p.copyWith(fontWeight: FontWeight.bold),
-          ),
-          if (!isLoadingSong && audioDuration != null)
+    return Visibility(
+      visible: canControlMusicIndependently,
+      maintainSize: false,
+      maintainAnimation: false,
+      maintainState: false,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.card,
+          borderRadius: defaultBorderRadius,
+          border: Border.all(color: theme.colorScheme.border),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '현재 재생 중: ${selectedSong.title}',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.p.copyWith(fontWeight: FontWeight.bold),
+            ),
             Padding(
               padding: const EdgeInsets.only(top: 4.0),
               child: Text(
@@ -67,63 +66,52 @@ class MusicControlWidget extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              ShadButton.ghost(
-                icon: Padding(
-                  padding: const EdgeInsets.only(right: 4.0),
-                  child: Icon(
-                    isPlaying
-                        ? Icons.pause_circle_outline
-                        : Icons.play_circle_outline,
-                    size: 24,
-                    color:
-                        canControlMusicIndependently
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.mutedForeground,
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                ShadButton.ghost(
+                  icon: Padding(
+                    padding: const EdgeInsets.only(right: 4.0),
+                    child: Icon(
+                      isPlaying
+                          ? Icons.pause_circle_outline
+                          : Icons.play_circle_outline,
+                      size: 24,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  onPressed: onPlayPause,
+                  child: Text(
+                    isPlaying ? '일시정지' : '재생',
+                    style: theme.textTheme.p.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                onPressed: canControlMusicIndependently ? onPlayPause : null,
-                child: Text(
-                  isPlaying ? '일시정지' : '재생',
-                  style: theme.textTheme.p.copyWith(
-                    color:
-                        canControlMusicIndependently
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.mutedForeground,
-                    fontWeight: FontWeight.w500,
+                ShadButton.ghost(
+                  icon: Padding(
+                    padding: const EdgeInsets.only(right: 4.0),
+                    child: Icon(
+                      Icons.stop_circle,
+                      size: 24,
+                      color: theme.colorScheme.destructive,
+                    ),
+                  ),
+                  onPressed: onStop,
+                  child: Text(
+                    '정지',
+                    style: theme.textTheme.p.copyWith(
+                      color: theme.colorScheme.destructive,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-              ShadButton.ghost(
-                icon: Padding(
-                  padding: const EdgeInsets.only(right: 4.0),
-                  child: Icon(
-                    Icons.stop_circle,
-                    size: 24,
-                    color:
-                        canControlMusicIndependently
-                            ? theme.colorScheme.destructive
-                            : theme.colorScheme.mutedForeground,
-                  ),
-                ),
-                onPressed: canControlMusicIndependently ? onStop : null,
-                child: Text(
-                  '정지',
-                  style: theme.textTheme.p.copyWith(
-                    color:
-                        canControlMusicIndependently
-                            ? theme.colorScheme.destructive
-                            : theme.colorScheme.mutedForeground,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

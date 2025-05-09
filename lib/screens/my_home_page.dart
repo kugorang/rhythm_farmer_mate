@@ -282,22 +282,26 @@ class _MyHomePageState extends State<MyHomePage> {
         _audioDuration != null &&
         _audioDuration!.inSeconds > 0 &&
         _currentPlaybackSpeed > 0) {
-      final totalDurationAdjusted =
+      final totalDurationAdjustedInSeconds =
           _audioDuration!.inSeconds / _currentPlaybackSpeed;
-      if (totalDurationAdjusted > 0) {
-        final elapsedTimeAdjusted =
-            totalDurationAdjusted - _remainingTime.inSeconds;
+      if (totalDurationAdjustedInSeconds > 0) {
+        final double elapsedTimeInSeconds =
+            totalDurationAdjustedInSeconds -
+            _remainingTime.inSeconds.toDouble();
+        double newProgress = (elapsedTimeInSeconds /
+                totalDurationAdjustedInSeconds)
+            .clamp(0.0, 1.0);
+        if (newProgress > 0.999 && newProgress < 1.001) newProgress = 1.0;
+        if (newProgress < 0.001 && newProgress > -0.001) newProgress = 0.0;
         setState(() {
-          _progressPercent = (elapsedTimeAdjusted / totalDurationAdjusted)
-              .clamp(0.0, 1.0);
+          _progressPercent = newProgress;
         });
       } else {
         setState(() {
-          _progressPercent = _remainingTime.inSeconds > 0 ? 0.0 : 1.0;
+          _progressPercent = _remainingTime.inSeconds == 0 ? 1.0 : 0.0;
         });
       }
-    } else if (!_isChallengeRunning) {
-      // 챌린지 중이 아니면 진행도 0으로.
+    } else {
       setState(() {
         _progressPercent = 0.0;
       });
@@ -307,14 +311,13 @@ class _MyHomePageState extends State<MyHomePage> {
   void _startChallenge() {
     if (_isChallengeRunning) return;
     if (_audioDuration == null) {
-      if (mounted) {
+      if (mounted)
         ShadToaster.of(context).show(
           ShadToast(
             title: const Text('알림'),
             description: const Text('음악을 불러오는 중입니다.'),
           ),
         );
-      }
       return;
     }
     _remainingTime = Duration(
@@ -328,6 +331,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         _progressPercent = 0.0;
       });
+      // _updateProgress(); // 이미 위에서 0으로 설정됨. _updateProgress()는 타이머 틱에서 호출.
     }
 
     setState(() {
@@ -337,8 +341,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _audioPlayer.setSpeed(
       _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
     );
-    _audioPlayer.play(); // 챌린지 시작 시 음악 자동 재생
-
+    _audioPlayer.play();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -352,7 +355,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _updateProgress();
       }
     });
-    _restartBpmTimer(); // 챌린지 시작 시 BPM 타이머(시각화) 활성화
+    _restartBpmTimer();
   }
 
   void _stopChallenge({bool completed = false}) {
@@ -419,13 +422,8 @@ class _MyHomePageState extends State<MyHomePage> {
       _audioPlayer.setSpeed(
         _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
       );
-
-      // 챌린지 중이 아니면서 음악 재생 중이거나, 챌린지 중일 때만 BPM 타이머 재시작
-      if ((_isPlaying && !_isChallengeRunning) || _isChallengeRunning) {
+      if ((_isPlaying && !_isChallengeRunning) || _isChallengeRunning)
         _restartBpmTimer();
-      }
-
-      // 챌린지 중이 아닐 때만, 변경된 BPM과 재생속도에 맞춰 남은 시간과 진행도 업데이트
       if (!_isChallengeRunning && _audioDuration != null) {
         _remainingTime = Duration(
           seconds:
@@ -433,9 +431,13 @@ class _MyHomePageState extends State<MyHomePage> {
                       (_currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0))
                   .round(),
         );
-        _progressPercent = 0.0; // BPM 변경 시 진행도는 0으로 초기화
+        if (mounted) {
+          setState(() {
+            _progressPercent = 0.0;
+          }); // 진행도 0으로 설정
+        }
         _updateTimerText();
-        _updateProgress(); // _updateProgress 호출로 진행도 0 반영
+        // _updateProgress(); // 이미 위에서 0으로 설정 후 UI 업데이트됨
       }
     });
   }
@@ -708,27 +710,33 @@ class _MyHomePageState extends State<MyHomePage> {
                       borderRadius: defaultBorderRadius,
                     ),
                     const SizedBox(height: 12),
-                    BpmControlSectionWidget(
-                      isLoadingSong: _isLoadingSong,
-                      isChallengeRunning: _isChallengeRunning,
-                      currentManualBpm: _currentManualBpm,
-                      beatHighlighter: _beatHighlighter,
-                      bpmChangedByTap: _bpmChangedByTap,
-                      bpmIndicatorScale: bpmIndicatorScale,
-                      bpmIndicatorColor: bpmIndicatorColor,
-                      bpmTextColor: bpmTextColor,
-                      defaultBorderRadius: defaultBorderRadius,
-                      tapTimestamps: _tapTimestamps,
-                      onChangeBpmToPreset: _changeBpmToPreset,
-                      onChangeBpm: _changeBpm,
-                      onStartBpmAdjustTimer: _startBpmAdjustTimer,
-                      onStopBpmAdjustTimer: _stopBpmAdjustTimer,
-                      onHandleTapForBpm: _handleTapForBpm,
-                      slowBpm: slowBpm,
-                      normalBpm: normalBpm,
-                      fastBpm: fastBpm,
+                    Visibility(
+                      visible: canInteractWithSettings,
+                      child: BpmControlSectionWidget(
+                        isLoadingSong: _isLoadingSong,
+                        isChallengeRunning: _isChallengeRunning,
+                        currentManualBpm: _currentManualBpm,
+                        beatHighlighter: _beatHighlighter,
+                        bpmChangedByTap: _bpmChangedByTap,
+                        bpmIndicatorScale: bpmIndicatorScale,
+                        bpmIndicatorColor: bpmIndicatorColor,
+                        bpmTextColor: bpmTextColor,
+                        defaultBorderRadius: defaultBorderRadius,
+                        tapTimestamps: _tapTimestamps,
+                        onChangeBpmToPreset: _changeBpmToPreset,
+                        onChangeBpm: _changeBpm,
+                        onStartBpmAdjustTimer: _startBpmAdjustTimer,
+                        onStopBpmAdjustTimer: _stopBpmAdjustTimer,
+                        onHandleTapForBpm: _handleTapForBpm,
+                        slowBpm: slowBpm,
+                        normalBpm: normalBpm,
+                        fastBpm: fastBpm,
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    if (canInteractWithSettings)
+                      const SizedBox(height: 24)
+                    else
+                      const SizedBox(height: 12),
                     ProgressDisplayWidget(
                       isLoadingSong: _isLoadingSong,
                       isChallengeRunning: _isChallengeRunning,
