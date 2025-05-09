@@ -27,8 +27,8 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
   SongCategoryType? _selectedCategoryType;
   final _youtubeUrlController = TextEditingController();
   final _bpmController = TextEditingController(); // BPM 입력용 컨트롤러
-  PlayMode _defaultPlayMode = PlayMode.normal;
-  Map<String, PlayMode> _songPlayModes = {};
+  // PlayMode _defaultPlayMode = PlayMode.normal; // 삭제 (재생 화면에서 선택)
+  // Map<String, PlayMode> _songPlayModes = {}; // 삭제 (재생 화면에서 선택)
 
   // 기본 제공 곡 목록 (실제 앱에서는 별도 데이터 소스에서 관리하는 것이 좋음)
   final List<Song> _baseSongList = [
@@ -87,11 +87,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
       setState(() {
         _userRegisteredSongs = userSongs;
         _fullSongList = [..._baseSongList, ..._userRegisteredSongs];
-        for (var song in _fullSongList) {
-          // 노래를 식별할 고유 ID가 필요. 여기서는 title을 사용하나, 중복 가능성 있음.
-          // 실제 앱에서는 Song 객체에 고유 ID를 추가하는 것이 좋음.
-          _songPlayModes.putIfAbsent(song.title, () => _defaultPlayMode);
-        }
+        // _songPlayModes 초기화 로직 삭제
       });
     }
   }
@@ -302,6 +298,99 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     );
   }
 
+  // 사용자 등록 곡 관리 다이얼로그
+  Future<void> _showUserSongManagementDialog() async {
+    // _loadSongs를 호출하여 최신 사용자 곡 목록을 가져올 수 있지만, 현재 _userRegisteredSongs 사용
+    // await _loadSongs(); // 필요시 호출
+    return showShadDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          // 다이얼로그 내부에서 setState를 사용하기 위해
+          builder: (context, setDialogState) {
+            return ShadDialog(
+              title: const Text('내가 등록한 노동요 관리'),
+              description: Text('총 ${_userRegisteredSongs.length}곡'),
+              child: SizedBox(
+                width: double.maxFinite,
+                height: MediaQuery.of(context).size.height * 0.5, // 높이 조절
+                child:
+                    _userRegisteredSongs.isEmpty
+                        ? const Center(child: Text('등록된 노래가 없습니다.'))
+                        : ListView.builder(
+                          itemCount: _userRegisteredSongs.length,
+                          itemBuilder: (ctx, index) {
+                            final song = _userRegisteredSongs[index];
+                            return ListTile(
+                              title: Text(song.title),
+                              subtitle: Text(
+                                song.filePath ?? song.youtubeVideoId ?? '정보 없음',
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.redAccent,
+                                ),
+                                tooltip: '삭제',
+                                onPressed: () async {
+                                  bool? confirmed = await showShadDialog<bool>(
+                                    context: context,
+                                    builder:
+                                        (context) => ShadDialog(
+                                          title: const Text('삭제 확인'),
+                                          description: Text(
+                                            '\'${song.title}\' 노래를 삭제하시겠습니까?',
+                                          ),
+                                          actions: [
+                                            ShadButton.ghost(
+                                              child: const Text('취소'),
+                                              onPressed:
+                                                  () => Navigator.of(
+                                                    context,
+                                                  ).pop(false),
+                                            ),
+                                            ShadButton.destructive(
+                                              child: const Text('삭제'),
+                                              onPressed:
+                                                  () => Navigator.of(
+                                                    context,
+                                                  ).pop(true),
+                                            ),
+                                          ],
+                                        ),
+                                  );
+                                  if (confirmed == true) {
+                                    await _userSongService.deleteUserSong(song);
+                                    await _loadSongs(); // 전체 목록 및 현재 화면 다시 로드
+                                    setDialogState(() {}); // 다이얼로그 내부 UI 갱신
+                                    if (mounted)
+                                      ShadToaster.of(context).show(
+                                        ShadToast(
+                                          description: Text(
+                                            '${song.title} 삭제됨',
+                                          ),
+                                        ),
+                                      );
+                                  }
+                                },
+                              ),
+                            );
+                          },
+                        ),
+              ),
+              actions: [
+                ShadButton(
+                  child: const Text('닫기'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _youtubeUrlController.dispose();
@@ -309,100 +398,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     super.dispose();
   }
 
-  Widget _buildPlayModeToggle(Song song) {
-    // song 파라미터는 이제 개별 곡 모드 설정에만 사용하거나, 목록 전체 모드 설정 UI에서는 사용 안 함
-    // 여기서는 UI 일관성을 위해 일단 유지하고, 전체/랜덤 모드는 별도 처리 가정
-    PlayMode currentMode = _songPlayModes[song.title] ?? _defaultPlayMode;
-
-    // 전체/랜덤 재생은 현재 선택된 displayedSongs 목록에 대한 의미로 가정
-    // UI에서는 현재 곡 옆에 표시되지만, 실제 동작은 목록 단위가 될 수 있음
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          icon: Icon(
-            Icons.repeat_one,
-            color:
-                currentMode == PlayMode.repeat
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
-            size: 20,
-          ),
-          tooltip: '한 곡 반복',
-          onPressed: () {
-            setState(() {
-              _songPlayModes[song.title] = PlayMode.repeat;
-            });
-          },
-        ),
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          icon: Icon(
-            Icons.play_arrow,
-            color:
-                currentMode == PlayMode.normal
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
-            size: 20,
-          ),
-          tooltip: '일반 재생',
-          onPressed: () {
-            setState(() {
-              _songPlayModes[song.title] = PlayMode.normal;
-            });
-          },
-        ),
-        // 전체 재생 버튼 (현재 목록 기준)
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          icon: Icon(
-            Icons.repeat,
-            color:
-                currentMode == PlayMode.allSongs
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
-            size: 20,
-          ),
-          tooltip: '목록 전체 반복 재생',
-          onPressed: () {
-            // 이 모드는 특정 곡이 아닌, 목록 전체에 대한 설정으로 간주.
-            // UI상으로는 각 곡 옆에 있지만, 선택 시 전체 목록 재생 모드로 상태 변경 필요.
-            // 예를 들어, _selectedOverallPlayMode 같은 변수를 두고 업데이트.
-            // 여기서는 일단 각 곡의 PlayMode를 allSongs로 설정하는 것으로 단순화.
-            setState(() {
-              _songPlayModes[song.title] = PlayMode.allSongs;
-              // 또는 별도의 상태 변수 _overallPlayMode = PlayMode.allSongs; 업데이트
-            });
-          },
-        ),
-        // 랜덤 재생 버튼 (현재 목록 기준)
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          icon: Icon(
-            Icons.shuffle,
-            color:
-                currentMode == PlayMode.shuffle
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
-            size: 20,
-          ),
-          tooltip: '목록 랜덤 재생',
-          onPressed: () {
-            setState(() {
-              _songPlayModes[song.title] = PlayMode.shuffle;
-              // 또는 _overallPlayMode = PlayMode.shuffle;
-            });
-          },
-        ),
-      ],
-    );
-  }
+  // Widget _buildPlayModeToggle(Song song) { ... } // 이 메소드는 재생 화면으로 이동
 
   @override
   Widget build(BuildContext context) {
@@ -427,6 +423,16 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         ),
         backgroundColor: theme.colorScheme.primary,
         actions: [
+          Tooltip(
+            message: '내가 등록한 노동요 관리',
+            child: ShadButton.ghost(
+              icon: const Icon(
+                Icons.playlist_play_rounded,
+                color: Colors.white,
+              ),
+              onPressed: _showUserSongManagementDialog,
+            ),
+          ),
           ValueListenableBuilder<ThemeMode>(
             valueListenable: themeModeNotifier,
             builder: (context, currentMode, child) {
@@ -530,8 +536,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                       itemCount: displayedSongs.length,
                       itemBuilder: (context, index) {
                         final song = displayedSongs[index];
-                        PlayMode currentSongPlayMode =
-                            _songPlayModes[song.title] ?? _defaultPlayMode;
+                        // PlayMode currentSongPlayMode = _songPlayModes[song.title] ?? _defaultPlayMode; // 재생 모드 선택 UI 제거
                         return Card(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -556,37 +561,26 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                                 fontSize: 17,
                               ),
                             ),
-                            subtitle: Text(
-                              'BPM: ${song.bpm}',
-                              style: theme.textTheme.small,
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildPlayModeToggle(song),
-                                const SizedBox(width: 4),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.play_circle_fill_rounded,
-                                    size: 32,
+                            // subtitle: Text('BPM: ${song.bpm}', style: theme.textTheme.small), // BPM 표시 제거
+                            trailing: IconButton(
+                              icon: const Icon(
+                                Icons.play_circle_fill_rounded,
+                                size: 32,
+                              ),
+                              color: theme.colorScheme.primary,
+                              tooltip: '이 노래 재생하기',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => MyHomePage(
+                                          selectedSong: song,
+                                          // initialPlayMode는 MyHomePage에서 기본값(normal) 사용 또는 재생 화면에서 선택
+                                        ),
                                   ),
-                                  color: theme.colorScheme.primary,
-                                  tooltip: '이 노래 재생하기',
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (context) => MyHomePage(
-                                              selectedSong: song,
-                                              initialPlayMode:
-                                                  currentSongPlayMode,
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ),
                         );

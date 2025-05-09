@@ -10,9 +10,10 @@ import './progress_display_widget.dart';
 import './music_control_widget.dart';
 // import './challenge_control_button_widget.dart'; // 사용 안 함
 import 'package:rhythm_farmer_mate/screens/my_home_page.dart'
-    show PomodoroState; // PomodoroState enum 가져오기
+    show PomodoroState, PlayMode; // PomodoroState enum 가져오기, PlayMode 추가
 import 'package:rhythm_farmer_mate/widgets/pomodoro_control_button_widget.dart'
     show PomodoroState, PomodoroControlButtonWidget; // PomodoroState와 위젯 모두 가져옴
+import './playback_mode_control_widget.dart'; // PlaybackModeControlWidget 임포트 추가
 // import './song_selection_widget.dart';
 // import './playback_mode_control_widget.dart';
 
@@ -45,8 +46,8 @@ class HomeContentWidget extends StatelessWidget {
   final int speedPresetSlow; // 이름 변경 (slowBpm -> speedPresetSlow)
   final int speedPresetNormal; // 이름 변경 (normalBpm -> speedPresetNormal)
   final int speedPresetFast; // 이름 변경 (fastBpm -> speedPresetFast)
-  // final PlayMode playMode; // 제거
-  // final Function(PlayMode) onPlayModeChanged; // 제거
+  final PlayMode playMode; // 추가
+  final Function(PlayMode) onPlayModeChanged; // 추가
   final bool isYoutubeMode;
   final PomodoroState currentPomodoroState;
   final int pomodoroCycleCount;
@@ -79,7 +80,8 @@ class HomeContentWidget extends StatelessWidget {
     required this.speedPresetSlow, // 이름 변경
     required this.speedPresetNormal, // 이름 변경
     required this.speedPresetFast, // 이름 변경
-    // final PlayMode playMode, // 제거
+    required this.playMode, // 추가
+    required this.onPlayModeChanged, // 추가
     required this.isYoutubeMode,
     required this.currentPomodoroState,
     required this.pomodoroCycleCount,
@@ -154,6 +156,14 @@ class HomeContentWidget extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                     ),
+                  PlaybackModeControlWidget(
+                    currentPlayMode: playMode,
+                    onPlayModeChanged: onPlayModeChanged,
+                    isDisabled:
+                        isLoadingSong ||
+                        currentPomodoroState != PomodoroState.stopped,
+                  ),
+                  const SizedBox(height: 16),
                   TimerDisplayWidget(
                     isLoadingSong: isLoadingSong,
                     timerText: timerText,

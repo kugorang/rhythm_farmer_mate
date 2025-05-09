@@ -402,6 +402,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         isYoutubeMode: _isYoutubeMode,
                         currentPomodoroState: _pomodoroState,
                         pomodoroCycleCount: _pomodoroCycleCount,
+                        playMode: _playMode,
+                        onPlayModeChanged: _changePlayMode,
                       ),
                     ),
                   ],

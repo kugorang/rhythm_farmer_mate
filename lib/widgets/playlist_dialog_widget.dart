@@ -27,7 +27,7 @@ class PlaylistDialogWidget extends StatelessWidget {
       description: Text('총 ${songList.length}곡'),
       child: SizedBox(
         width: double.maxFinite,
-        height: MediaQuery.of(context).size.height * 0.4,
+        height: 300,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -75,7 +75,6 @@ class PlaylistDialogWidget extends StatelessWidget {
                   songList.isEmpty
                       ? const Center(child: Text('재생 목록이 비어있습니다.'))
                       : ListView.builder(
-                        shrinkWrap: true,
                         itemCount: songList.length,
                         itemBuilder: (context, index) {
                           final song = songList[index];
