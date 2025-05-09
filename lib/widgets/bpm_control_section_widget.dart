@@ -42,166 +42,184 @@ class BpmControlSectionWidget extends StatelessWidget {
     required this.onStartBpmAdjustTimer,
     required this.onStopBpmAdjustTimer,
     required this.onHandleTapForBpm,
-    required this.slowBpm,
-    required this.normalBpm,
-    required this.fastBpm,
+    this.slowBpm = 60,
+    this.normalBpm = 90,
+    this.fastBpm = 120,
   });
-
-  Widget buildBpmPresetButton(
-    BuildContext context,
-    String label,
-    int presetBpm,
-  ) {
-    final theme = ShadTheme.of(context);
-    final isSelected = currentManualBpm == presetBpm;
-    final bool buttonVisible = !isChallengeRunning && !isLoadingSong;
-
-    return Visibility(
-      visible: buttonVisible,
-      maintainSize: false,
-      maintainAnimation: false,
-      maintainState: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: ShadButton.outline(
-          size: ShadButtonSize.sm,
-          onPressed: () => onChangeBpmToPreset(presetBpm),
-          child: Text(
-            label,
-            style: theme.textTheme.p.copyWith(
-              color:
-                  isSelected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.foreground.withOpacity(0.7),
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final canInteractWithSettings = !isChallengeRunning && !isLoadingSong;
+    final isDisabled = isLoadingSong || isChallengeRunning;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Visibility(
-          visible: canInteractWithSettings,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              buildBpmPresetButton(context, '느리게', slowBpm),
-              buildBpmPresetButton(context, '보통', normalBpm),
-              buildBpmPresetButton(context, '빠르게', fastBpm),
-            ],
-          ),
-        ),
-        if (canInteractWithSettings) const SizedBox(height: 8),
-        Visibility(
-          visible: canInteractWithSettings,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: currentManualBpm > 30 ? () => onChangeBpm(-5) : null,
-                onLongPressStart:
-                    currentManualBpm > 30
-                        ? (details) => onStartBpmAdjustTimer(-1)
-                        : null,
-                onLongPressEnd: (details) => onStopBpmAdjustTimer(),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Icon(
-                    Icons.remove_circle_outline,
-                    size: 30,
-                    color:
-                        !(currentManualBpm > 30)
-                            ? theme.colorScheme.mutedForeground
-                            : theme.colorScheme.foreground,
-                  ),
+      children: <Widget>[
+        // BPM 표시기 원형 컨트롤
+        Semantics(
+          label: '현재 BPM: $currentManualBpm',
+          hint: '탭하여 BPM 측정하기',
+          excludeSemantics: true,
+          button: true,
+          enabled: !isDisabled,
+          onTap: isDisabled ? null : onHandleTapForBpm,
+          child: GestureDetector(
+            onTap: isDisabled ? null : onHandleTapForBpm,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 100),
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDisabled ? theme.colorScheme.muted : bpmIndicatorColor,
+                border: Border.all(
+                  color:
+                      isDisabled
+                          ? theme.colorScheme.border
+                          : bpmChangedByTap
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.border,
+                  width: 2,
                 ),
               ),
-              Expanded(
-                child: AnimatedContainer(
-                  duration: Duration(
-                    milliseconds: (60000 /
-                            (currentManualBpm > 0 ? currentManualBpm : 60) /
-                            2)
-                        .round()
-                        .clamp(50, 300),
+              child: Center(
+                child: AnimatedScale(
+                  scale: bpmIndicatorScale,
+                  duration: const Duration(milliseconds: 50),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Text('BPM', style: theme.textTheme.muted),
+                      const SizedBox(height: 2),
+                      Text(
+                        currentManualBpm.toString(),
+                        style: TextStyle(
+                          fontSize: 36,
+                          color:
+                              isDisabled
+                                  ? theme.colorScheme.mutedForeground
+                                  : bpmTextColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  curve: Curves.elasticOut,
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  height: 52,
-                  transform: Matrix4.identity()..scale(bpmIndicatorScale),
-                  transformAlignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: bpmIndicatorColor,
-                    borderRadius: defaultBorderRadius,
-                    border: Border.all(color: theme.colorScheme.border),
-                  ),
-                  child: Center(
-                    child:
-                        isLoadingSong
-                            ? Text(
-                              "--",
-                              style: theme.textTheme.p.copyWith(
-                                color: theme.colorScheme.mutedForeground,
-                              ),
-                            )
-                            : Text(
-                              '현재 박자: $currentManualBpm',
-                              style: theme.textTheme.p.copyWith(
-                                color: bpmTextColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: currentManualBpm < 240 ? () => onChangeBpm(5) : null,
-                onLongPressStart:
-                    currentManualBpm < 240
-                        ? (details) => onStartBpmAdjustTimer(1)
-                        : null,
-                onLongPressEnd: (details) => onStopBpmAdjustTimer(),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Icon(
-                    Icons.add_circle_outline,
-                    size: 30,
-                    color:
-                        !(currentManualBpm < 240)
-                            ? theme.colorScheme.mutedForeground
-                            : theme.colorScheme.foreground,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (canInteractWithSettings) const SizedBox(height: 12),
-        Visibility(
-          visible: canInteractWithSettings,
-          child: SizedBox(
-            width: double.infinity,
-            child: ShadButton(
-              size: ShadButtonSize.lg,
-              onPressed: onHandleTapForBpm,
-              child: Text(
-                '탭하여 박자 입력 (${tapTimestamps.length}번 탭)',
-                style: theme.textTheme.p.copyWith(
-                  color: theme.colorScheme.primaryForeground,
                 ),
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 24),
+
+        // BPM 빠르기 프리셋 버튼 그룹
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            // 느리게 버튼
+            Semantics(
+              label: '느린 템포',
+              value: '$slowBpm BPM',
+              button: true,
+              enabled: !isDisabled,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: ShadButton(
+                  size: ShadButtonSize.sm,
+                  variant: ShadButtonVariant.outline,
+                  onPressed:
+                      isDisabled ? null : () => onChangeBpmToPreset(slowBpm),
+                  child: Text('$slowBpm'),
+                ),
+              ),
+            ),
+
+            // 중간 버튼
+            Semantics(
+              label: '중간 템포',
+              value: '$normalBpm BPM',
+              button: true,
+              enabled: !isDisabled,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: ShadButton(
+                  size: ShadButtonSize.sm,
+                  variant: ShadButtonVariant.outline,
+                  onPressed:
+                      isDisabled ? null : () => onChangeBpmToPreset(normalBpm),
+                  child: Text('$normalBpm'),
+                ),
+              ),
+            ),
+
+            // 빠르게 버튼
+            Semantics(
+              label: '빠른 템포',
+              value: '$fastBpm BPM',
+              button: true,
+              enabled: !isDisabled,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: ShadButton(
+                  size: ShadButtonSize.sm,
+                  variant: ShadButtonVariant.outline,
+                  onPressed:
+                      isDisabled ? null : () => onChangeBpmToPreset(fastBpm),
+                  child: Text('$fastBpm'),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // BPM 미세 조절 버튼
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            // 감소 버튼
+            Semantics(
+              label: 'BPM 감소',
+              value: '1 단위로 감소',
+              button: true,
+              enabled: !isDisabled,
+              child: Listener(
+                onPointerDown:
+                    isDisabled
+                        ? null
+                        : (event) => onStartBpmAdjustTimer(0), // 값은 무시되므로 0 전달
+                onPointerUp: isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                onPointerCancel:
+                    isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                child: ShadButton.icon(
+                  variant: ShadButtonVariant.outline,
+                  onPressed: isDisabled ? null : () => onChangeBpm(-1),
+                  icon: const Icon(Icons.remove),
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+
+            // 증가 버튼
+            Semantics(
+              label: 'BPM 증가',
+              value: '1 단위로 증가',
+              button: true,
+              enabled: !isDisabled,
+              child: Listener(
+                onPointerDown:
+                    isDisabled
+                        ? null
+                        : (event) => onStartBpmAdjustTimer(0), // 값은 무시되므로 0 전달
+                onPointerUp: isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                onPointerCancel:
+                    isDisabled ? null : (_) => onStopBpmAdjustTimer(),
+                child: ShadButton.icon(
+                  variant: ShadButtonVariant.outline,
+                  onPressed: isDisabled ? null : () => onChangeBpm(1),
+                  icon: const Icon(Icons.add),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

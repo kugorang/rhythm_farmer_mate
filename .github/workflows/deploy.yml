@@ -3,7 +3,7 @@ name: Deploy Flutter Web to GitHub Pages
 on:
   push:
     branches:
-      - main # 또는 주 사용 브랜치 이름 (예: master)
+      - master # 주 사용 브랜치 이름
 
 jobs:
   build_and_deploy:

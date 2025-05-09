@@ -233,8 +233,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _initAudio() {
     if (_selectedSong.youtubeVideoId != null) {
-      _initializeYoutubePlayer();
-      _isLoadingSong = false;
+      // 유튜브 플레이어를 지연 초기화 (화면이 완전히 빌드된 후)
+      Future.microtask(() {
+        _initializeYoutubePlayer();
+      });
+      if (mounted) setState(() => _isLoadingSong = false);
     } else if (_selectedSong.filePath != null &&
         _selectedSong.filePath!.isNotEmpty) {
       _audioService = AudioService();
@@ -249,45 +252,75 @@ class _MyHomePageState extends State<MyHomePage> {
   void _initializeYoutubePlayer() {
     if (_selectedSong.youtubeVideoId == null) return;
 
-    // 기존 컨트롤러가 있다면 해제
-    _youtubeController?.close();
+    try {
+      // 기존 컨트롤러가 있다면 해제
+      _youtubeController?.close();
 
-    // 새 컨트롤러 생성 (최신 API 패턴 사용)
-    _youtubeController = YoutubePlayerController();
+      // 로딩 상태 표시
+      if (mounted) {
+        setState(() => _isLoadingSong = true);
+      }
 
-    // 비디오 로드
-    _youtubeController!.loadVideoById(videoId: _selectedSong.youtubeVideoId!);
+      // 새 컨트롤러 생성 (최신 API 패턴 사용)
+      _youtubeController = YoutubePlayerController();
 
-    // 일정 시간 후에 상태 확인
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
+      // 비디오 로드
+      _youtubeController!.loadVideoById(videoId: _selectedSong.youtubeVideoId!);
 
-      setState(() {
-        _isPlaying = false;
-        _audioDuration = const Duration(minutes: 5); // 예상 시간
+      // 비디오 로드 및 준비를 위한 지연 시간
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
 
-        if (!_isChallengeRunning) {
-          _remainingTime = _audioDuration!;
-          _updateTimerText();
-          _progressPercent = 0.0;
-          _updateProgress();
-        }
+        setState(() {
+          _isPlaying = false;
+          _audioDuration = const Duration(minutes: 5); // 예상 시간
 
-        _isLoadingSong = false;
+          if (!_isChallengeRunning) {
+            _remainingTime = _audioDuration!;
+            _updateTimerText();
+            _progressPercent = 0.0;
+            _updateProgress();
+          }
+
+          _isLoadingSong = false;
+        });
       });
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSong = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('유튜브 플레이어 초기화 오류: $e'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
+    }
   }
 
   // YouTube 비디오 재생 (새 API)
   Future<void> _startYoutubeVideo() async {
     if (_youtubeController == null) return;
 
-    await _youtubeController!.playVideo();
+    try {
+      await _youtubeController!.playVideo();
 
-    if (mounted) {
-      setState(() {
-        _isPlaying = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isPlaying = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('유튜브 재생 오류: $e'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
     }
   }
 
@@ -584,8 +617,12 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _initAudioService() async {
-    if (_selectedSong.filePath == null || _selectedSong.filePath!.isEmpty)
+    if (_selectedSong.filePath == null || _selectedSong.filePath!.isEmpty) {
+      setState(() {
+        _isLoadingSong = false;
+      });
       return;
+    }
 
     setState(() {
       _isLoadingSong = true;
@@ -593,21 +630,31 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       await _audioService.loadSong(_selectedSong, context);
-      _updateTimerText();
-      setState(() {
-        _isLoadingSong = false;
-      });
+      if (mounted) {
+        _updateTimerText();
+        setState(() {
+          _isLoadingSong = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoadingSong = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingSong = false;
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('오디오 로드 오류: $e'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오디오 로드 오류: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red[700],
+            action: SnackBarAction(
+              label: '재시도',
+              textColor: Colors.white,
+              onPressed: () => _initAudioService(),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -833,6 +880,30 @@ class _MyHomePageState extends State<MyHomePage> {
     final theme = ShadTheme.of(context);
     final defaultBorderRadius = theme.radius;
 
+    // 색상 계산 로직 개선
+    final Color bpmIndicatorColor;
+    final Color bpmTextColor;
+
+    if (_isLoadingSong) {
+      bpmIndicatorColor = theme.colorScheme.muted;
+      bpmTextColor = theme.colorScheme.mutedForeground;
+    } else if (_beatHighlighter) {
+      // 불투명도 적용 대신 색상 자체를 조정
+      bpmIndicatorColor =
+          Color.lerp(theme.colorScheme.card, theme.colorScheme.primary, 0.35) ??
+          theme.colorScheme.primary;
+      bpmTextColor = theme.colorScheme.primary;
+    } else if (_bpmChangedByTap) {
+      // 불투명도 적용 대신 색상 자체를 조정
+      bpmIndicatorColor =
+          Color.lerp(theme.colorScheme.card, theme.colorScheme.primary, 0.1) ??
+          theme.colorScheme.card;
+      bpmTextColor = theme.colorScheme.primary;
+    } else {
+      bpmIndicatorColor = theme.colorScheme.card;
+      bpmTextColor = theme.colorScheme.foreground;
+    }
+
     return Scaffold(
       appBar: AppBarWidget(
         title: _selectedSong.title,
@@ -897,13 +968,14 @@ class _MyHomePageState extends State<MyHomePage> {
                           beatHighlighter: _beatHighlighter,
                           bpmChangedByTap: _bpmChangedByTap,
                           bpmIndicatorScale: _beatHighlighter ? 1.1 : 1.0,
-                          bpmIndicatorColor: _getBpmIndicatorColor(theme),
-                          bpmTextColor: _getBpmTextColor(theme),
+                          bpmIndicatorColor: bpmIndicatorColor,
+                          bpmTextColor: bpmTextColor,
                           tapTimestamps: _tapTimestamps,
                           currentManualBpm: _currentManualBpm,
-                          onChangeBpmToPreset: (bpm) => _changeBpmToPreset(bpm),
-                          onChangeBpm: (delta) => _changeBpm(delta),
-                          onStartBpmAdjustTimer: (_) => _startBpmAdjustTimer(),
+                          onChangeBpmToPreset: _changeBpmToPreset,
+                          onChangeBpm: _changeBpm,
+                          onStartBpmAdjustTimer:
+                              (int _) => _startBpmAdjustTimer(),
                           onStopBpmAdjustTimer: () => _bpmAdjustTimer?.cancel(),
                           onHandleTapForBpm: _handleTapForBpm,
                           progressPercent: _progressPercent,
@@ -937,26 +1009,6 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
-  }
-
-  Color _getBpmIndicatorColor(ShadThemeData theme) {
-    return _isLoadingSong
-        ? theme.colorScheme.muted
-        : (_beatHighlighter
-            ? theme.colorScheme.primary.withOpacity(0.35)
-            : (_bpmChangedByTap
-                ? theme.colorScheme.primary.withOpacity(0.1)
-                : theme.colorScheme.card));
-  }
-
-  Color _getBpmTextColor(ShadThemeData theme) {
-    return _isLoadingSong
-        ? theme.colorScheme.mutedForeground
-        : (_bpmChangedByTap
-            ? theme.colorScheme.primary
-            : (_beatHighlighter
-                ? theme.colorScheme.primary
-                : theme.colorScheme.foreground));
   }
 
   Future<void> _handlePlayPause() async {
@@ -1130,20 +1182,46 @@ class YouTubePlayerWidget extends StatelessWidget {
             controller: controller,
             aspectRatio: 16 / 9,
             builder: (context, player) {
-              return YoutubeValueBuilder(
-                controller: controller,
-                builder: (context, value) {
-                  // 현재 상태와 영상 정보를 부모에게 전달
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    onPlayerStateChanged(
-                      value.playerState,
-                      Duration.zero,
-                      value.metaData.duration,
-                    );
-                  });
+              return Column(
+                children: [
+                  player,
+                  // YoutubeValueBuilder를 별도로 배치하여 상태 모니터링 최적화
+                  YoutubeValueBuilder(
+                    controller: controller,
+                    buildWhen: (previous, current) {
+                      // 필요한 상태 변경 시에만 빌더 호출
+                      return previous.playerState != current.playerState ||
+                          previous.metaData.duration !=
+                              current.metaData.duration;
+                    },
+                    builder: (context, value) {
+                      // 주기적으로 현재 재생 위치를 가져오기
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        try {
+                          // 현재 위치를 초로 가져와서 Duration으로 변환
+                          final positionSec = await controller.currentTime;
+                          final position = Duration(
+                            seconds: positionSec.toInt(),
+                          );
 
-                  return Column(children: [player]);
-                },
+                          onPlayerStateChanged(
+                            value.playerState,
+                            position,
+                            value.metaData.duration,
+                          );
+                        } catch (e) {
+                          // 위치를 가져오지 못하면 0으로 처리
+                          onPlayerStateChanged(
+                            value.playerState,
+                            Duration.zero,
+                            value.metaData.duration,
+                          );
+                        }
+                      });
+                      return const SizedBox.shrink(); // UI 영향 없음
+                    },
+                  ),
+                ],
               );
             },
           ),
@@ -1157,6 +1235,37 @@ class YouTubePlayerWidget extends StatelessWidget {
           width: double.infinity,
           onPressed: onChallengeButtonPressed,
           child: Text(isChallengeRunning ? '챌린지 중단' : '챌린지 시작'),
+        ),
+        const SizedBox(height: 16),
+        // 유튜브 컨트롤 버튼 추가
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ShadButton.outline(
+              onPressed: () => controller.seekTo(seconds: 0),
+              icon: const Icon(Icons.restart_alt),
+              child: const Text('처음으로'),
+            ),
+            const SizedBox(width: 8),
+            YoutubeValueBuilder(
+              controller: controller,
+              buildWhen: (previous, current) {
+                return previous.playerState != current.playerState;
+              },
+              builder: (context, value) {
+                final isPlaying = value.playerState == PlayerState.playing;
+                return ShadButton.outline(
+                  onPressed:
+                      () =>
+                          isPlaying
+                              ? controller.pauseVideo()
+                              : controller.playVideo(),
+                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                  child: Text(isPlaying ? '일시정지' : '재생'),
+                );
+              },
+            ),
+          ],
         ),
       ],
     );
