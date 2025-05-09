@@ -119,8 +119,10 @@ class AudioService {
         onMetronomeTick!(visualBeatState);
       }
 
+      // 메트로놈 소리는 visualBeatState와 관계없이 매 비트마다 재생
       if (_isMetronomeSoundEnabled &&
-          _metronomePlayer.processingState == ProcessingState.ready) {
+          (_metronomePlayer.processingState == ProcessingState.ready ||
+              _metronomePlayer.processingState == ProcessingState.completed)) {
         _metronomePlayer
             .seek(Duration.zero)
             .then((_) {
