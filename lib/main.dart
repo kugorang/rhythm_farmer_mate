@@ -541,9 +541,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ShadButton.outline(
-                          icon: const Icon(
+                          child: const Icon(
                             Icons.remove_circle_outline,
-                            size: 20,
+                            size: 16,
                           ),
                           onPressed:
                               _isTimerRunning ||
@@ -562,12 +562,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                               : 60) /
                                           2)
                                       .round(),
-                            ), // 비트 간격의 절반으로 애니메이션 속도 설정
+                            ),
                             margin: const EdgeInsets.symmetric(horizontal: 8),
                             height: 52,
                             transform:
-                                Matrix4.identity()
-                                  ..scale(bpmIndicatorScale), // 스케일 애니메이션 적용
+                                Matrix4.identity()..scale(bpmIndicatorScale),
                             transformAlignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: bpmIndicatorColor,
@@ -597,7 +596,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         ),
                         ShadButton.outline(
-                          icon: const Icon(Icons.add_circle_outline, size: 20),
+                          child: const Icon(Icons.add_circle_outline, size: 16),
                           onPressed:
                               _isTimerRunning ||
                                       _isLoadingSong ||
