@@ -7,10 +7,19 @@ on:
 
 jobs:
   build_and_deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write # pages 권한 추가
+      id-token: write # id-token 권한 추가
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # 최신 버전 사용 권장
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -21,13 +30,19 @@ jobs:
         run: flutter pub get
 
       - name: Build Flutter Web
-        run: flutter build web --release --base-href /${{ github.event.repository.name }}/
         # 저장소 이름으로 base-href 설정 (예: https://username.github.io/repository-name/)
+        # ${{ github.repository }}는 username/repository-name 형태이므로, 끝에 /를 추가해야 함.
+        # URL 경로 문제를 피하기 위해 base-href를 정확히 설정하는 것이 중요.
+        run: flutter build web --release --base-href /${{ github.event.repository.name }}/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5 # 최신 버전 사용 권장
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3 # 최신 버전 사용 권장
+        with:
+          path: ./build/web
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build/web
-          # publish_branch: gh-pages # 기본값은 gh-pages
-          # cname: your.custom.domain # 커스텀 도메인 사용 시
+        id: deployment
+        uses: actions/deploy-pages@v4 # 최신 버전 사용 권장
