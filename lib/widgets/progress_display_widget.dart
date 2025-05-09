@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../screens/my_home_page.dart' show PomodoroState;
+import './pomodoro_control_button_widget.dart' show PomodoroState;
 
 class ProgressDisplayWidget extends StatelessWidget {
   final bool isLoadingSong;

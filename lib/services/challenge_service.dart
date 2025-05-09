@@ -68,9 +68,9 @@ class ChallengeService {
       }
     }
 
-    if (selectedSong.filePath != null) {
-      audioService.stopBpmTicker();
-    }
+    // if (selectedSong.filePath != null) { // 메트로놈 기능 삭제로 해당 라인 제거
+    //   audioService.stopBpmTicker();
+    // }
 
     if (completed && context != null) {
       ScaffoldMessenger.of(context).showSnackBar(

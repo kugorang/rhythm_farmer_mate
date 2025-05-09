@@ -313,9 +313,6 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBarWidget(
         title: _currentSelectedSong.title,
         onPlaylistPressed: _showCurrentSongInfoDialog,
-        onMetronomeSettingsPressed: () {
-          /* 메트로놈 기능 삭제됨 */
-        },
       ),
       body: Center(
         child: ConstrainedBox(
@@ -340,19 +337,13 @@ class _MyHomePageState extends State<MyHomePage> {
                         selectedSong: _currentSelectedSong,
                         timerText: _timerText,
                         defaultBorderRadius: defaultBorderRadius,
-                        beatHighlighter: false,
-                        bpmChangedByTap: false,
-                        bpmIndicatorScale: 1.0,
-                        bpmIndicatorColor: bpmIndicatorColor,
-                        bpmTextColor: bpmTextColor,
-                        tapTimestamps: const [],
                         currentManualBpm: _currentManualBpm,
-                        onChangeBpmToPreset: _changeSpeedToPreset,
-                        onChangeBpm: _changeSpeed,
-                        onStartBpmAdjustTimer:
+                        onChangeSpeedPreset: _changeSpeedToPreset,
+                        onChangeSpeed: _changeSpeed,
+                        onStartSpeedAdjustTimer:
                             (int delta) => _startSpeedAdjustTimer(delta),
-                        onStopBpmAdjustTimer: () => _speedAdjustTimer?.cancel(),
-                        onHandleTapForBpm: () {},
+                        onStopSpeedAdjustTimer:
+                            () => _speedAdjustTimer?.cancel(),
                         progressPercent: _progressPercent,
                         isPlaying:
                             _isYoutubeMode
@@ -371,9 +362,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           else
                             _stopPomodoro();
                         },
-                        slowBpm: slowBpm,
-                        normalBpm: normalBpm,
-                        fastBpm: fastBpm,
+                        speedPresetSlow: 0,
+                        speedPresetNormal: 1,
+                        speedPresetFast: 2,
                         isYoutubeMode: _isYoutubeMode,
                         currentPomodoroState: _pomodoroState,
                         pomodoroCycleCount: _pomodoroCycleCount,
@@ -676,14 +667,9 @@ class _MyHomePageState extends State<MyHomePage> {
 class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final VoidCallback? onPlaylistPressed;
-  final VoidCallback onMetronomeSettingsPressed;
 
-  const AppBarWidget({
-    Key? key,
-    required this.title,
-    this.onPlaylistPressed,
-    required this.onMetronomeSettingsPressed,
-  }) : super(key: key);
+  const AppBarWidget({Key? key, required this.title, this.onPlaylistPressed})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {

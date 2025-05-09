@@ -5,7 +5,7 @@ import '../models/song_category.dart'; // SongCategoryType을 사용하기 위�
 // import '../screens/my_home_page.dart'
 //     show PlayMode; // MyHomePageState의 public 메서드/변수 접근을 위해
 import './timer_display_widget.dart';
-import './bpm_control_section_widget.dart';
+import './speed_control_section_widget.dart';
 import './progress_display_widget.dart';
 import './music_control_widget.dart';
 // import './challenge_control_button_widget.dart'; // 사용 안 함
@@ -23,18 +23,18 @@ class HomeContentWidget extends StatelessWidget {
   // final Function(Song?) onSongChanged; // 제거
   final String timerText;
   final BorderRadius defaultBorderRadius;
-  final bool beatHighlighter;
-  final bool bpmChangedByTap;
-  final double bpmIndicatorScale;
-  final Color bpmIndicatorColor;
-  final Color bpmTextColor;
-  final List<DateTime> tapTimestamps;
-  final int currentManualBpm;
-  final Function(int) onChangeBpmToPreset;
-  final Function(int) onChangeBpm;
-  final Function(int) onStartBpmAdjustTimer;
-  final Function() onStopBpmAdjustTimer;
-  final Function() onHandleTapForBpm;
+  // final bool beatHighlighter; // 삭제
+  // final bool bpmChangedByTap; // 삭제
+  // final double bpmIndicatorScale; // 삭제
+  // final Color bpmIndicatorColor; // 삭제
+  // final Color bpmTextColor; // 삭제
+  // final List<DateTime> tapTimestamps; // 삭제
+  final int currentManualBpm; // 현재 곡의 BPM (표시용 또는 속도 조절 기준)
+  final Function(int) onChangeSpeedPreset; // 이름 변경됨
+  final Function(int) onChangeSpeed; // 이름 변경됨
+  final Function(int) onStartSpeedAdjustTimer; // 이름 변경됨
+  final Function() onStopSpeedAdjustTimer; // 이름 변경됨
+  // final Function() onHandleTapForBpm; // 삭제
   final double progressPercent;
   final bool isPlaying;
   final Duration? audioDuration; // 로컬 파일 재생 시 필요
@@ -42,9 +42,9 @@ class HomeContentWidget extends StatelessWidget {
   final Function() onPlayPause;
   final Function() onStop;
   final Function() onPomodoroButtonPressed;
-  final int slowBpm;
-  final int normalBpm;
-  final int fastBpm;
+  final int speedPresetSlow; // 이름 변경 (slowBpm -> speedPresetSlow)
+  final int speedPresetNormal; // 이름 변경 (normalBpm -> speedPresetNormal)
+  final int speedPresetFast; // 이름 변경 (fastBpm -> speedPresetFast)
   // final PlayMode playMode; // 제거
   // final Function(PlayMode) onPlayModeChanged; // 제거
   final bool isYoutubeMode;
@@ -57,18 +57,18 @@ class HomeContentWidget extends StatelessWidget {
     required this.selectedSong,
     required this.timerText,
     required this.defaultBorderRadius,
-    required this.beatHighlighter,
-    required this.bpmChangedByTap,
-    required this.bpmIndicatorScale,
-    required this.bpmIndicatorColor,
-    required this.bpmTextColor,
-    required this.tapTimestamps,
+    // required this.beatHighlighter, // 삭제
+    // required this.bpmChangedByTap, // 삭제
+    // required this.bpmIndicatorScale, // 삭제
+    // required this.bpmIndicatorColor, // 삭제
+    // required this.bpmTextColor, // 삭제
+    // required this.tapTimestamps, // 삭제
     required this.currentManualBpm,
-    required this.onChangeBpmToPreset,
-    required this.onChangeBpm,
-    required this.onStartBpmAdjustTimer,
-    required this.onStopBpmAdjustTimer,
-    required this.onHandleTapForBpm,
+    required this.onChangeSpeedPreset,
+    required this.onChangeSpeed,
+    required this.onStartSpeedAdjustTimer,
+    required this.onStopSpeedAdjustTimer,
+    // required this.onHandleTapForBpm, // 삭제
     required this.progressPercent,
     required this.isPlaying,
     this.audioDuration,
@@ -76,9 +76,10 @@ class HomeContentWidget extends StatelessWidget {
     required this.onPlayPause,
     required this.onStop,
     required this.onPomodoroButtonPressed,
-    this.slowBpm = 60,
-    this.normalBpm = 90,
-    this.fastBpm = 120,
+    required this.speedPresetSlow, // 이름 변경
+    required this.speedPresetNormal, // 이름 변경
+    required this.speedPresetFast, // 이름 변경
+    // final PlayMode playMode, // 제거
     required this.isYoutubeMode,
     required this.currentPomodoroState,
     required this.pomodoroCycleCount,
@@ -91,9 +92,9 @@ class HomeContentWidget extends StatelessWidget {
         currentPomodoroState == PomodoroState.stopped &&
         !isLoadingSong &&
         !isYoutubeMode;
-    final bool bpmControlsEnabled =
-        currentPomodoroState == PomodoroState.stopped &&
-        !isLoadingSong; // BPM 컨트롤도 포모도로 중단 시에만
+    final bool
+    speedControlsEnabled = // bpmControlsEnabled -> speedControlsEnabled
+        currentPomodoroState == PomodoroState.stopped && !isLoadingSong;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -159,27 +160,20 @@ class HomeContentWidget extends StatelessWidget {
                     borderRadius: defaultBorderRadius,
                   ),
                   const SizedBox(height: 24), // 간격 증가
-                  if (bpmControlsEnabled)
-                    BpmControlSectionWidget(
+                  if (speedControlsEnabled)
+                    SpeedControlSectionWidget(
                       isLoadingSong: isLoadingSong,
-                      isChallengeRunning:
-                          currentPomodoroState != PomodoroState.stopped,
-                      currentManualBpm: currentManualBpm,
-                      beatHighlighter: beatHighlighter,
-                      bpmChangedByTap: bpmChangedByTap,
-                      bpmIndicatorScale: bpmIndicatorScale,
-                      bpmIndicatorColor: bpmIndicatorColor,
-                      bpmTextColor: bpmTextColor,
-                      defaultBorderRadius: defaultBorderRadius,
-                      tapTimestamps: tapTimestamps,
-                      onChangeBpmToPreset: onChangeBpmToPreset,
-                      onChangeBpm: onChangeBpm,
-                      onStartBpmAdjustTimer: onStartBpmAdjustTimer,
-                      onStopBpmAdjustTimer: onStopBpmAdjustTimer,
-                      onHandleTapForBpm: onHandleTapForBpm,
-                      slowBpm: slowBpm,
-                      normalBpm: normalBpm,
-                      fastBpm: fastBpm,
+                      isPomodoroActive:
+                          currentPomodoroState !=
+                          PomodoroState
+                              .stopped, // isChallengeRunning 대신 isPomodoroActive 사용 및 값 전달
+                      onChangeSpeedPreset: onChangeSpeedPreset,
+                      onChangeSpeed: onChangeSpeed,
+                      onStartSpeedAdjustTimer: onStartSpeedAdjustTimer,
+                      onStopSpeedAdjustTimer: onStopSpeedAdjustTimer,
+                      speedPresetSlow: speedPresetSlow,
+                      speedPresetNormal: speedPresetNormal,
+                      speedPresetFast: speedPresetFast,
                     ),
                 ],
               ),

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 // AudioPlayer 상태 접근 위해 필요할 수 있음
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../models/song.dart'; // Song 모델
-import '../screens/my_home_page.dart'
-    show PomodoroState; // PomodoroState 접근을 위해
+import './pomodoro_control_button_widget.dart'
+    show PomodoroState; // PomodoroState를 여기서 임포트
 
 class MusicControlWidget extends StatelessWidget {
   final bool isLoadingSong;
