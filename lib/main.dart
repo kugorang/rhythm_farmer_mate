@@ -562,7 +562,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           iconSize: 30,
                           color: Colors.blueGrey,
                           onPressed:
-                              _isTimerRunning || _isLoadingSong
+                              _isTimerRunning ||
+                                      _isLoadingSong ||
+                                      _currentManualBpm <= 30
                                   ? null
                                   : () => _changeBpm(-5),
                         ),
@@ -604,7 +606,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           iconSize: 30,
                           color: Colors.blueGrey,
                           onPressed:
-                              _isTimerRunning || _isLoadingSong
+                              _isTimerRunning ||
+                                      _isLoadingSong ||
+                                      _currentManualBpm >= 240
                                   ? null
                                   : () => _changeBpm(5),
                         ),
@@ -659,13 +663,17 @@ class _MyHomePageState extends State<MyHomePage> {
                               color: Colors.black87,
                             ),
                           ),
-                          if (!_isLoadingSong &&
-                              _audioDuration != null) // 로딩 중 아닐 때만 표시
-                            Text(
-                              '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (BPM: ${_selectedSong.bpm} -> $_currentManualBpm)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
+                          if (!_isLoadingSong && _audioDuration != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                _currentPlaybackSpeed == 1.0
+                                    ? "(원곡 속도, BPM: ${_selectedSong.bpm})"
+                                    : '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (BPM: ${_selectedSong.bpm} -> $_currentManualBpm)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
                             ),
                           const SizedBox(height: 10),
