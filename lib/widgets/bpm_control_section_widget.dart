@@ -124,7 +124,6 @@ class BpmControlSectionWidget extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: ShadButton(
                   size: ShadButtonSize.sm,
-                  variant: ShadButtonVariant.outline,
                   onPressed:
                       isDisabled ? null : () => onChangeBpmToPreset(slowBpm),
                   child: Text('$slowBpm'),
@@ -142,7 +141,6 @@ class BpmControlSectionWidget extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: ShadButton(
                   size: ShadButtonSize.sm,
-                  variant: ShadButtonVariant.outline,
                   onPressed:
                       isDisabled ? null : () => onChangeBpmToPreset(normalBpm),
                   child: Text('$normalBpm'),
@@ -160,7 +158,6 @@ class BpmControlSectionWidget extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: ShadButton(
                   size: ShadButtonSize.sm,
-                  variant: ShadButtonVariant.outline,
                   onPressed:
                       isDisabled ? null : () => onChangeBpmToPreset(fastBpm),
                   child: Text('$fastBpm'),
@@ -189,10 +186,9 @@ class BpmControlSectionWidget extends StatelessWidget {
                 onPointerUp: isDisabled ? null : (_) => onStopBpmAdjustTimer(),
                 onPointerCancel:
                     isDisabled ? null : (_) => onStopBpmAdjustTimer(),
-                child: ShadButton.icon(
-                  variant: ShadButtonVariant.outline,
+                child: ShadButton(
                   onPressed: isDisabled ? null : () => onChangeBpm(-1),
-                  icon: const Icon(Icons.remove),
+                  child: const Icon(Icons.remove),
                 ),
               ),
             ),
@@ -212,10 +208,9 @@ class BpmControlSectionWidget extends StatelessWidget {
                 onPointerUp: isDisabled ? null : (_) => onStopBpmAdjustTimer(),
                 onPointerCancel:
                     isDisabled ? null : (_) => onStopBpmAdjustTimer(),
-                child: ShadButton.icon(
-                  variant: ShadButtonVariant.outline,
+                child: ShadButton(
                   onPressed: isDisabled ? null : () => onChangeBpm(1),
-                  icon: const Icon(Icons.add),
+                  child: const Icon(Icons.add),
                 ),
               ),
             ),

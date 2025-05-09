@@ -36,10 +36,11 @@ class TimerDisplayWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12.0),
         child:
             isLoadingSong
-                ? const ShadSkeleton(
+                ? Container(
                   width: double.infinity,
                   height: 48,
-                  className: 'my-2',
+                  alignment: Alignment.center,
+                  child: const LinearProgressIndicator(),
                 )
                 : Text(
                   timerText,
