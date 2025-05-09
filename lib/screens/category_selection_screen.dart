@@ -7,6 +7,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../models/song_category.dart';
 import '../models/song.dart';
 import './my_home_page.dart';
+import '../my_app.dart';
 
 class CategorySelectionScreen extends StatefulWidget {
   const CategorySelectionScreen({super.key});
@@ -212,6 +213,29 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
           ),
         ),
         backgroundColor: theme.colorScheme.primary,
+        actions: [
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeModeNotifier,
+            builder: (context, currentMode, child) {
+              return ShadButton.ghost(
+                icon: Icon(
+                  currentMode == ThemeMode.dark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  color: theme.colorScheme.primaryForeground,
+                ),
+                onPressed: () {
+                  themeModeNotifier.value =
+                      currentMode == ThemeMode.light
+                          ? ThemeMode.dark
+                          : currentMode == ThemeMode.dark
+                          ? ThemeMode.system
+                          : ThemeMode.light;
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: ListView.builder(
         itemCount: categories.length,
