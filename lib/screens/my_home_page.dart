@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' hide BorderStyle;
 import 'package:just_audio/just_audio.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../models/song.dart'; // 상대 경로 또는 package:rhythm_farmer_mate/models/song.dart
+import '../models/song_category.dart'; // SongCategoryType enum import 추가
 import '../widgets/home_content_widget.dart'; // 새로 추가된 위젯
 import 'package:rhythm_farmer_mate/my_app.dart'; // themeModeNotifier 접근을 위해 추가 (또는 별도 파일로 분리)
 import '../widgets/playlist_dialog_widget.dart'; // 새로 추가된 위젯
@@ -19,7 +20,9 @@ enum PlayMode {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+  final SongCategoryType? selectedCategoryType; // 선택된 카테고리 타입 추가
+
+  const MyHomePage({super.key, this.selectedCategoryType}); // 생성자 수정
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -54,83 +57,126 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _bpmChangedByTap = false;
   Timer? _bpmAdjustTimer;
 
-  final List<Song> _songList = const [
+  List<Song> _filteredSongList = []; // 현재 카테고리에 맞는 곡 목록
+
+  final List<Song> _fullSongList = const [
     Song(
       filePath: 'assets/audio/emart_original.mp3',
       title: '이마트 로고송',
       bpm: 100,
+      categoryType: SongCategoryType.modernLaborSong,
     ),
-    Song(filePath: 'assets/audio/se0101.mp3', title: '논삶는소리 (강원 홍천군)', bpm: 69),
+    Song(
+      filePath: 'assets/audio/se0101.mp3',
+      title: '논삶는소리 (강원 홍천군)',
+      bpm: 69,
+      categoryType: SongCategoryType.traditionalNongyo1,
+      subCategory: '논고르기', // 예시 하위 카테고리
+    ),
     Song(
       filePath: 'assets/audio/se0102.mp3',
       title: '논고르는소리 (제주 서귀포시)',
       bpm: 93,
+      categoryType: SongCategoryType.traditionalNongyo1,
+      subCategory: '논고르기',
     ),
     Song(
       filePath: 'assets/audio/se0103.mp3',
       title: '모찌는소리-"얼른 하더니 한 춤" (강원 양양군)',
       bpm: 70,
+      categoryType: SongCategoryType.traditionalNongyo1,
+      subCategory: '모찌기',
     ),
     Song(
       filePath: 'assets/audio/se0104.mp3',
       title: '모찌는소리-"뭉치세 제치세" (충북 진천군)',
       bpm: 76,
+      categoryType: SongCategoryType.traditionalNongyo1,
+      subCategory: '모찌기',
     ),
     Song(
       filePath: 'assets/audio/se0201.mp3',
       title: '논매는소리-"헤헤 곯었네" (경기 안성군)',
       bpm: 52,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
     ),
     Song(
       filePath: 'assets/audio/se0202.mp3',
       title: '논매는소리-대허리 (경기 이천군)',
       bpm: 115,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
     ),
     Song(
       filePath: 'assets/audio/se0203.mp3',
       title: '논매는소리-오독떼기 (강원 양양군)',
       bpm: 107,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
     ),
     Song(
       filePath: 'assets/audio/se0204.mp3',
       title: '논매는소리-"얼카 덩어리" (충남 홍성군)',
       bpm: 62,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
     ),
     Song(
       filePath: 'assets/audio/se0301.mp3',
       title: '논매는소리-긴소리/들래기소리 (전남 무안군)',
       bpm: 66,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '논매기(2)',
     ),
     Song(
       filePath: 'assets/audio/se0302.mp3',
       title: '논매는소리-소오니소리 (경북 구미시)',
       bpm: 55,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '논매기(2)',
     ),
-    Song(filePath: 'assets/audio/se0303.mp3', title: '논매는소리 (경북 예천군)', bpm: 78),
+    Song(
+      filePath: 'assets/audio/se0303.mp3',
+      title: '논매는소리 (경북 예천군)',
+      bpm: 78,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '논매기(2)',
+    ),
     Song(
       filePath: 'assets/audio/se0304.mp3',
       title: '농사장원례소리-애롱대롱 (전남 나주군)',
       bpm: 91,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '기타',
     ),
     Song(
       filePath: 'assets/audio/se0401.mp3',
       title: '밭가는소리 (강원 홍천군)',
       bpm: 132,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
     ),
     Song(
       filePath: 'assets/audio/se0402.mp3',
       title: '밭일구는소리(따비질) (제주 북제주군)',
       bpm: 72,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
     ),
     Song(
       filePath: 'assets/audio/se0403.mp3',
       title: '밭고르는소리(곰방메질) (제주 북제주군)',
       bpm: 64,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
     ),
     Song(
       filePath: 'assets/audio/se0404.mp3',
       title: '밭밟는소리 (제주 북제주군)',
       bpm: 69,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
     ),
   ];
   late Song _selectedSong;
@@ -140,11 +186,28 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _currentSongIndex = 0; // 초기 인덱스 설정
+
+    // 선택된 카테고리에 따라 곡 목록 필터링
+    if (widget.selectedCategoryType != null) {
+      _filteredSongList =
+          _fullSongList
+              .where((song) => song.categoryType == widget.selectedCategoryType)
+              .toList();
+    } else {
+      // 카테고리가 선택되지 않은 경우 (예: 직접 MyHomePage로 접근 시) 모든 곡을 보여주거나 기본 카테고리 설정
+      _filteredSongList = List.from(_fullSongList);
+    }
+
+    _currentSongIndex = 0;
     _selectedSong =
-        _songList.isNotEmpty
-            ? _songList[_currentSongIndex] // 초기 인덱스로 곡 선택
-            : const Song(filePath: '', title: '노래 없음', bpm: 0);
+        _filteredSongList.isNotEmpty
+            ? _filteredSongList[_currentSongIndex]
+            : const Song(
+              filePath: '',
+              title: '노래 없음',
+              bpm: 0,
+              categoryType: SongCategoryType.modernLaborSong, // 기본값
+            );
     _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
 
     // AudioService 초기화 및 콜백 설정
@@ -614,29 +677,25 @@ class _MyHomePageState extends State<MyHomePage> {
         break;
 
       case PlayMode.allSongs:
-        // 전체 재생 모드 - 다음 곡으로 이동
-        _currentSongIndex = (_currentSongIndex + 1) % _songList.length;
-        await _onSongChanged(_songList[_currentSongIndex]);
-        if (mounted && _songList.isNotEmpty) {
+        _currentSongIndex = (_currentSongIndex + 1) % _filteredSongList.length;
+        await _onSongChanged(_filteredSongList[_currentSongIndex]);
+        if (mounted && _filteredSongList.isNotEmpty) {
           _audioService.play();
         }
         break;
 
       case PlayMode.shuffle:
-        // 랜덤 재생 모드 - 랜덤 곡 선택
-        if (_songList.length > 1) {
-          // 현재 곡을 제외한 다른 곡 중에서 랜덤 선택
+        if (_filteredSongList.length > 1) {
           int nextIndex;
           do {
-            nextIndex = _random.nextInt(_songList.length);
+            nextIndex = _random.nextInt(_filteredSongList.length);
           } while (nextIndex == _currentSongIndex);
           _currentSongIndex = nextIndex;
         } else {
           _currentSongIndex = 0;
         }
-
-        await _onSongChanged(_songList[_currentSongIndex]);
-        if (mounted && _songList.isNotEmpty) {
+        await _onSongChanged(_filteredSongList[_currentSongIndex]);
+        if (mounted && _filteredSongList.isNotEmpty) {
           _audioService.play();
         }
         break;
@@ -668,7 +727,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     // 현재 곡의 인덱스 찾기
-    final int newIndex = _songList.indexWhere(
+    final int newIndex = _filteredSongList.indexWhere(
       (song) => song.filePath == newSong.filePath,
     );
 
@@ -677,6 +736,8 @@ class _MyHomePageState extends State<MyHomePage> {
       print("곡 변경: $_currentSongIndex, ${newSong.title}");
     } else {
       print("곡 인덱스를 찾을 수 없음: ${newSong.title}");
+      // 만약 filteredSongList에 없다면, _fullSongList에서 찾아보고, 카테고리를 변경해야 할 수도 있음
+      // 여기서는 일단 현재 카테고리 내에서만 찾는다고 가정
     }
 
     // 현재 재생 중인 오디오 중지
@@ -773,7 +834,7 @@ class _MyHomePageState extends State<MyHomePage> {
       context: context,
       builder: (BuildContext context) {
         return PlaylistDialogWidget(
-          songList: _songList,
+          songList: _filteredSongList,
           selectedSong: _selectedSong,
           currentPlayMode: _playMode,
           onPlayModeChanged: _changePlayMode,
@@ -899,7 +960,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   isLoadingSong: _isLoadingSong,
                   isChallengeRunning: _isChallengeRunning,
                   selectedSong: _selectedSong,
-                  songList: _songList,
+                  songList: _filteredSongList,
                   onSongChanged: (Song? value) {
                     if (value != null) _onSongChanged(value);
                   },

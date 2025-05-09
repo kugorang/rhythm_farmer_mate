@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     Timer(const Duration(seconds: 2), () {
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home'); // 홈 라우트 이름
+        Navigator.of(context).pushReplacementNamed('/category-selection');
       }
     });
   }
@@ -30,7 +30,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.primary,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -43,13 +43,16 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 20),
             Text(
               '리듬농부 메이트',
-              style: theme.textTheme.h2.copyWith(
-                color: theme.colorScheme.primary,
+              style: theme.textTheme.h1.copyWith(
+                color: theme.colorScheme.primaryForeground,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 10),
             CircularProgressIndicator(
-              color: theme.colorScheme.primary.withOpacity(0.5),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                theme.colorScheme.primaryForeground,
+              ),
             ),
           ],
         ),

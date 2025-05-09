@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 // 올바른 경로로 수정 필요 (프로젝트 이름이 rhythm_farmer_mate라고 가정)
 import 'package:rhythm_farmer_mate/screens/splash_screen.dart';
 import 'package:rhythm_farmer_mate/screens/my_home_page.dart';
+import 'package:rhythm_farmer_mate/screens/category_selection_screen.dart';
 
 // ThemeMode 상태를 위한 ValueNotifier
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
@@ -48,6 +49,7 @@ class MyApp extends StatelessWidget {
           initialRoute: '/',
           routes: {
             '/': (context) => const SplashScreen(),
+            '/category-selection': (context) => const CategorySelectionScreen(),
             '/home': (context) => const MyHomePage(),
           },
         );
