@@ -582,8 +582,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final defaultBorderRadius = theme.radius;
-    final bpmIndicatorScale = _beatHighlighter ? 1.1 : 1.0;
-    // BPM 탭 성공 시 잠시 배경색 변경
+    final bpmIndicatorScale = _beatHighlighter ? 1.08 : 1.0;
     final bpmDisplayCardColor =
         _bpmChangedByTap
             ? theme.colorScheme.primary.withOpacity(0.1)
@@ -594,19 +593,22 @@ class _MyHomePageState extends State<MyHomePage> {
         _isLoadingSong
             ? theme.colorScheme.muted
             : (_beatHighlighter
-                ? theme.colorScheme.primary.withOpacity(0.3)
-                : bpmDisplayCardColor); // 탭 성공 시 배경색과 연동 또는 기본 카드색
-
+                ? theme.colorScheme.primary.withOpacity(0.35) // 비트 시 색상 더 진하게
+                : bpmDisplayCardColor);
     final bpmTextColor =
         _isLoadingSong
             ? theme.colorScheme.mutedForeground
             : (_bpmChangedByTap
-                ? theme
-                    .colorScheme
-                    .primary // 탭 성공 시 텍스트 색상도 변경
+                ? theme.colorScheme.primary
                 : (_beatHighlighter
                     ? theme.colorScheme.primary
                     : theme.colorScheme.foreground));
+
+    final currentBeatIntervalMs =
+        (60000 / (_currentManualBpm > 0 ? _currentManualBpm : 60)).round();
+    final bpmAnimationDuration = Duration(
+      milliseconds: (currentBeatIntervalMs / 3).round().clamp(50, 300),
+    ); // 비트 간격의 1/3, 최소 50ms 최대 300ms
 
     Widget buildBpmPresetButton(String label, int presetBpm) {
       final isSelected = _currentManualBpm == presetBpm;
@@ -756,21 +758,13 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                         Expanded(
                           child: AnimatedContainer(
-                            duration: Duration(
-                              milliseconds:
-                                  (60000 /
-                                          (_currentManualBpm > 0
-                                              ? _currentManualBpm
-                                              : 60) /
-                                          2)
-                                      .round(),
-                            ),
+                            duration: bpmAnimationDuration,
+                            curve: Curves.elasticOut,
                             margin: const EdgeInsets.symmetric(horizontal: 8),
                             height: 52,
                             transform:
                                 Matrix4.identity()..scale(bpmIndicatorScale),
                             transformAlignment: Alignment.center,
-                            // bpmDisplayCardColor를 AnimatedContainer 배경색으로 사용
                             decoration: BoxDecoration(
                               color: bpmIndicatorColor,
                               borderRadius: defaultBorderRadius,
@@ -832,11 +826,21 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    ShadProgress(
-                      value: _isLoadingSong ? 0 : _progressPercent * 100,
-                      minHeight: 12,
-                      color: theme.colorScheme.primary,
-                      backgroundColor: theme.colorScheme.muted,
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      tween: Tween<double>(
+                        begin: _progressPercent * 100,
+                        end: _isLoadingSong ? 0 : _progressPercent * 100,
+                      ),
+                      builder: (context, value, child) {
+                        return ShadProgress(
+                          value: value,
+                          minHeight: 12,
+                          color: theme.colorScheme.primary,
+                          backgroundColor: theme.colorScheme.muted,
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
                     Center(
