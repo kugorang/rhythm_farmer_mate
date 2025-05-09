@@ -278,6 +278,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _updateProgress() {
     if (!mounted) return;
+    double newProgress = 0.0;
+
     if (_isChallengeRunning &&
         _audioDuration != null &&
         _audioDuration!.inSeconds > 0 &&
@@ -288,24 +290,21 @@ class _MyHomePageState extends State<MyHomePage> {
         final double elapsedTimeInSeconds =
             totalDurationAdjustedInSeconds -
             _remainingTime.inSeconds.toDouble();
-        double newProgress = (elapsedTimeInSeconds /
-                totalDurationAdjustedInSeconds)
-            .clamp(0.0, 1.0);
-        if (newProgress > 0.999 && newProgress < 1.001) newProgress = 1.0;
-        if (newProgress < 0.001 && newProgress > -0.001) newProgress = 0.0;
-        setState(() {
-          _progressPercent = newProgress;
-        });
+        newProgress = (elapsedTimeInSeconds / totalDurationAdjustedInSeconds);
+
+        if (newProgress < 0) newProgress = 0.0;
+        if (newProgress > 1) newProgress = 1.0;
+        if (newProgress < 0.000001) newProgress = 0.0;
+        if (newProgress > 0.999999) newProgress = 1.0;
       } else {
-        setState(() {
-          _progressPercent = _remainingTime.inSeconds == 0 ? 1.0 : 0.0;
-        });
+        newProgress = _remainingTime.inSeconds == 0 ? 1.0 : 0.0;
       }
-    } else {
-      setState(() {
-        _progressPercent = 0.0;
-      });
     }
+    // _isChallengeRunning이 false이면 newProgress는 초기값 0.0 유지됨
+    // 또는 명시적으로 설정: else { newProgress = 0.0; }
+    setState(() {
+      _progressPercent = newProgress;
+    });
   }
 
   void _startChallenge() {
@@ -331,7 +330,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         _progressPercent = 0.0;
       });
-      // _updateProgress(); // 이미 위에서 0으로 설정됨. _updateProgress()는 타이머 틱에서 호출.
+      // _updateProgress(); // 여기서 호출하지 않음
     }
 
     setState(() {
@@ -352,7 +351,7 @@ class _MyHomePageState extends State<MyHomePage> {
       } else {
         _remainingTime = _remainingTime - const Duration(seconds: 1);
         _updateTimerText();
-        _updateProgress();
+        _updateProgress(); // 매초 진행도 업데이트
       }
     });
     _restartBpmTimer();
