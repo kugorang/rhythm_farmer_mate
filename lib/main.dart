@@ -159,6 +159,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _tapTempoResetTimer;
   static const int _minTapsForBpm = 4;
   static const Duration _tapTempoTimeout = Duration(seconds: 3);
+  bool _bpmChangedByTap = false; // BPM 탭 성공 시각적 피드백용
 
   @override
   void initState() {
@@ -485,9 +486,12 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     final now = DateTime.now();
-    _tapTimestamps.add(now);
+    if (mounted) {
+      setState(() {
+        _tapTimestamps.add(now);
+      });
+    }
 
-    // 이전 탭 리셋 타이머가 있다면 취소
     _tapTempoResetTimer?.cancel();
 
     if (_tapTimestamps.length >= _minTapsForBpm) {
@@ -498,17 +502,16 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       }
 
-      // 마지막 몇 개의 간격만 사용하거나, 이상치 제거 로직 추가 가능 (여기서는 단순 평균)
       final averageInterval =
           intervals.isNotEmpty
               ? intervals.reduce((a, b) => a + b) / intervals.length
               : 0;
 
-      if (averageInterval > 0) {
+      if (averageInterval > 250 && averageInterval < 2000) {
+        // BPM 30 ~ 240 범위에 해당하는 간격 (2000ms ~ 250ms)
         final newBpm = (60000 / averageInterval).round().clamp(30, 240);
         setState(() {
           _currentManualBpm = newBpm;
-          // BPM 변경에 따른 후속 처리 (재생 속도 등)
           final songBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
           _currentPlaybackSpeed =
               (songBpm == 0)
@@ -518,9 +521,7 @@ class _MyHomePageState extends State<MyHomePage> {
             _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
           );
 
-          if (_isPlaying || (_bpmTimer?.isActive ?? false)) {
-            _restartBpmTimer(); // 시각적 BPM 표시 및 메트로놈 즉시 업데이트
-          }
+          if (_isPlaying || (_bpmTimer?.isActive ?? false)) _restartBpmTimer();
           if (!_isTimerRunning && _audioDuration != null) {
             _remainingTime = Duration(
               seconds:
@@ -533,27 +534,48 @@ class _MyHomePageState extends State<MyHomePage> {
             _updateTimerText();
             _updateProgress();
           }
+          _bpmChangedByTap = true; // 시각적 피드백 활성화
         });
         if (mounted) {
           ShadToaster.of(
             context,
           ).show(ShadToast(description: Text('박자 설정됨: $_currentManualBpm')));
         }
-        _tapTimestamps.clear(); // 계산 후 초기화
+        // 짧은 시간 후 시각적 피드백 비활성화
+        Timer(const Duration(milliseconds: 500), () {
+          if (mounted)
+            setState(() {
+              _bpmChangedByTap = false;
+            });
+        });
+        _tapTimestamps.clear();
       } else {
-        _tapTimestamps.clear(); // 유효하지 않은 간격이면 초기화
+        if (mounted)
+          ShadToaster.of(
+            context,
+          ).show(ShadToast(description: const Text('일정한 간격으로 탭해주세요.')));
+        _tapTimestamps.clear();
       }
     } else {
-      // 최소 탭 횟수 미만이면, 타임아웃 후 초기화 타이머 설정
       _tapTempoResetTimer = Timer(_tapTempoTimeout, () {
-        _tapTimestamps.clear();
-        if (mounted) {
-          // print('탭 타임아웃, 탭 기록 초기화');
-          // ShadToaster.of(context).show(ShadToast(description: Text('탭 타임아웃')));
+        if (_tapTimestamps.isNotEmpty &&
+            _tapTimestamps.length < _minTapsForBpm) {
+          if (mounted) {
+            ShadToaster.of(context).show(
+              ShadToast(
+                description: Text('탭 횟수가 부족합니다. (최소 ${_minTapsForBpm}번)'),
+              ),
+            );
+          }
         }
+        if (mounted)
+          setState(() {
+            _tapTimestamps.clear();
+          });
       });
     }
-    // 탭 피드백 (예: 버튼 색상 잠시 변경 등은 버튼 자체에서 처리 가능)
+    // 탭할 때마다 버튼 텍스트 업데이트를 위해 setState 호출
+    if (mounted) setState(() {});
   }
 
   @override
@@ -561,18 +583,30 @@ class _MyHomePageState extends State<MyHomePage> {
     final theme = ShadTheme.of(context);
     final defaultBorderRadius = theme.radius;
     final bpmIndicatorScale = _beatHighlighter ? 1.1 : 1.0;
+    // BPM 탭 성공 시 잠시 배경색 변경
+    final bpmDisplayCardColor =
+        _bpmChangedByTap
+            ? theme.colorScheme.primary.withOpacity(0.1)
+            : (_isLoadingSong
+                ? theme.colorScheme.muted
+                : theme.colorScheme.card);
     final bpmIndicatorColor =
         _isLoadingSong
             ? theme.colorScheme.muted
             : (_beatHighlighter
                 ? theme.colorScheme.primary.withOpacity(0.3)
-                : theme.colorScheme.card);
+                : bpmDisplayCardColor); // 탭 성공 시 배경색과 연동 또는 기본 카드색
+
     final bpmTextColor =
         _isLoadingSong
             ? theme.colorScheme.mutedForeground
-            : (_beatHighlighter
-                ? theme.colorScheme.primary
-                : theme.colorScheme.foreground);
+            : (_bpmChangedByTap
+                ? theme
+                    .colorScheme
+                    .primary // 탭 성공 시 텍스트 색상도 변경
+                : (_beatHighlighter
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.foreground));
 
     Widget buildBpmPresetButton(String label, int presetBpm) {
       final isSelected = _currentManualBpm == presetBpm;
@@ -736,6 +770,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             transform:
                                 Matrix4.identity()..scale(bpmIndicatorScale),
                             transformAlignment: Alignment.center,
+                            // bpmDisplayCardColor를 AnimatedContainer 배경색으로 사용
                             decoration: BoxDecoration(
                               color: bpmIndicatorColor,
                               borderRadius: defaultBorderRadius,
@@ -785,7 +820,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       child: ShadButton(
                         size: ShadButtonSize.lg,
                         child: Text(
-                          '여기를 탭하여 박자 맞추기 (${_tapTimestamps.length})',
+                          '여기를 탭하여 박자 입력 (${_tapTimestamps.length})',
                           style: theme.textTheme.p.copyWith(
                             color: theme.colorScheme.primaryForeground,
                           ),
