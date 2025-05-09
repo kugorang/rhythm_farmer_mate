@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 // AudioPlayer 상태 접근 위해 필요할 수 있음
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../models/song.dart'; // Song 모델
+import '../screens/my_home_page.dart'
+    show PomodoroState; // PomodoroState 접근을 위해
 
 class MusicControlWidget extends StatelessWidget {
   final bool isLoadingSong;
-  final bool isChallengeRunning; // 챌린지 중에는 독립적 음악 제어 제한 위함
-  final bool isPlaying; // 현재 음악 재생 상태
+  final PomodoroState currentPomodoroState; // 포모도로 상태를 직접 받음
+  final bool isPlaying;
   final Song selectedSong;
   final Duration? audioDuration;
   final double currentPlaybackSpeed;
@@ -19,7 +21,7 @@ class MusicControlWidget extends StatelessWidget {
   const MusicControlWidget({
     super.key,
     required this.isLoadingSong,
-    required this.isChallengeRunning,
+    required this.currentPomodoroState, // 추가
     required this.isPlaying,
     required this.selectedSong,
     this.audioDuration,
@@ -33,8 +35,11 @@ class MusicControlWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final canControlMusicIndependently =
-        !isChallengeRunning && !isLoadingSong && audioDuration != null;
+    // 음악 컨트롤은 포모도로가 '중단' 상태일 때만 활성화, 또는 로딩 중이 아닐 때
+    final bool canControlMusicIndependently =
+        currentPomodoroState == PomodoroState.stopped &&
+        !isLoadingSong &&
+        (audioDuration != null || selectedSong.youtubeVideoId != null);
 
     return Visibility(
       visible: canControlMusicIndependently,
@@ -59,11 +64,12 @@ class MusicControlWidget extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4.0),
               child: Text(
                 currentPlaybackSpeed == 1.0
-                    ? "(원곡 빠르기, 현재 박자: ${selectedSong.bpm > 0 ? selectedSong.bpm : 'N/A'})"
-                    : '재생 빠르기: ${currentPlaybackSpeed.toStringAsFixed(1)}배 (원곡 박자: ${selectedSong.bpm > 0 ? selectedSong.bpm : 'N/A'} -> 현재 박자: $currentManualBpm)',
+                    ? "(원곡 빠르기, BPM: ${selectedSong.bpm > 0 ? selectedSong.bpm : 'N/A'})"
+                    : '재생 빠르기: ${currentPlaybackSpeed.toStringAsFixed(1)}배 (원곡 BPM: ${selectedSong.bpm > 0 ? selectedSong.bpm : 'N/A'} -> 현재 BPM: $currentManualBpm)',
                 style: theme.textTheme.small.copyWith(
                   color: theme.colorScheme.mutedForeground,
                 ),
+                textAlign: TextAlign.center, // 중앙 정렬 추가
               ),
             ),
             const SizedBox(height: 20),
@@ -77,7 +83,7 @@ class MusicControlWidget extends StatelessWidget {
                       isPlaying
                           ? Icons.pause_circle_outline
                           : Icons.play_circle_outline,
-                      size: 24,
+                      size: 28, // 아이콘 크기 약간 증가
                       color: theme.colorScheme.primary,
                     ),
                   ),
@@ -95,7 +101,7 @@ class MusicControlWidget extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 4.0),
                     child: Icon(
                       Icons.stop_circle,
-                      size: 24,
+                      size: 28, // 아이콘 크기 약간 증가
                       color: theme.colorScheme.destructive,
                     ),
                   ),

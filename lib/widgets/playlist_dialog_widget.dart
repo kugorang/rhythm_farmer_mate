@@ -44,11 +44,6 @@ class PlaylistDialogWidget extends StatelessWidget {
                   value: PlayMode.repeat,
                   child: Text('한 곡 반복 재생'),
                 ),
-                DropdownMenuItem(
-                  value: PlayMode.allSongs,
-                  child: Text('전체 목록 순차 재생'),
-                ),
-                DropdownMenuItem(value: PlayMode.shuffle, child: Text('랜덤 재생')),
               ],
             ),
             const SizedBox(height: 8),

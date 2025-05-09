@@ -1,21 +1,38 @@
+import 'package:hive/hive.dart';
 import './song_category.dart';
 
-// Song 데이터 클래스
-class Song {
-  final String? filePath; // Nullable String
-  final String title;
-  final int bpm;
-  final SongCategoryType categoryType; // 곡의 주 카테고리
-  final String? subCategory; // 하위 카테고리 (선택적)
-  final String? youtubeVideoId; // Nullable String, 이 필드명이 정확해야 함
+part 'song.g.dart'; // Hive generator가 생성할 파일
 
-  const Song({
-    this.filePath, // 생성자에서도 nullable로 받음
+// Song 데이터 클래스
+@HiveType(typeId: 0) // HiveType 어노테이션 추가 및 고유 typeId 지정
+class Song extends HiveObject {
+  // HiveObject를 확장
+  @HiveField(0) // 각 필드에 HiveField 어노테이션 및 고유 인덱스 지정
+  final String? filePath;
+
+  @HiveField(1)
+  final String title;
+
+  @HiveField(2)
+  final int bpm;
+
+  @HiveField(3)
+  final SongCategoryType categoryType;
+
+  @HiveField(4)
+  final String? subCategory;
+
+  @HiveField(5)
+  final String? youtubeVideoId;
+
+  // Hive는 기본 생성자가 필요할 수 있음
+  Song({
+    this.filePath,
     required this.title,
     required this.bpm,
     required this.categoryType,
     this.subCategory,
-    this.youtubeVideoId, // 생성자 파라미터명도 정확해야 함
+    this.youtubeVideoId,
   }) : assert(
          filePath != null || youtubeVideoId != null,
          'filePath 또는 youtubeVideoId 둘 중 하나는 반드시 있어야 합니다.',

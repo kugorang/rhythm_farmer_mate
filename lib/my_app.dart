@@ -153,14 +153,14 @@ class MyApp extends StatelessWidget {
           ),
           debugShowCheckedModeBanner: false,
           builder: (context, child) => ShadToaster(child: child!),
-          initialRoute: '/', // 초기 라우트 설정
+          initialRoute: '/category-selection', // 초기 라우트를 변경
           routes: {
-            '/': (context) => const SplashScreen(),
+            '/':
+                (context) =>
+                    const SplashScreen(), // 스플래시를 유지하고 싶다면, 스플래시에서 /category-selection으로 이동
             '/category-selection': (context) => const CategorySelectionScreen(),
-            '/home': (context) => const MyHomePage(),
-            // MyHomePage 라우트에서 selectedCategoryType과 userSongs를 전달해야 하는 경우,
-            // 아래와 같이 onGenerateRoute를 사용하거나, 각 route에서 데이터를 받아 처리해야 함.
-            // 여기서는 MyHomePage 기본 생성자 사용으로 가정.
+            // '/home': (context) => const MyHomePage(), // MyHomePage는 이제 직접 Song 객체를 받아야 함
+            // MyHomePage 라우트를 유지하고 싶다면 onGenerateRoute 사용 필요
           },
         );
       },

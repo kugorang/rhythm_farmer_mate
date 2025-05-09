@@ -18,18 +18,14 @@ class PlaybackModeControlWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
 
-    // 재생 모드에 따른 아이콘과 텍스트 결정
     IconData getModeIcon(PlayMode mode) {
       switch (mode) {
         case PlayMode.normal:
           return Icons.play_arrow;
         case PlayMode.repeat:
           return Icons.repeat_one;
-        case PlayMode.allSongs:
-          return Icons.repeat;
-        case PlayMode.shuffle:
-          return Icons.shuffle;
       }
+      return Icons.play_arrow;
     }
 
     String getModeText(PlayMode mode) {
@@ -38,16 +34,14 @@ class PlaybackModeControlWidget extends StatelessWidget {
           return '일반 재생';
         case PlayMode.repeat:
           return '한 곡 반복';
-        case PlayMode.allSongs:
-          return '전체 재생';
-        case PlayMode.shuffle:
-          return '랜덤 재생';
       }
+      return '일반 재생';
     }
 
-    // 현재 선택된 모드의 아이콘과 텍스트
     final currentModeIcon = getModeIcon(currentPlayMode);
     final currentModeText = getModeText(currentPlayMode);
+
+    final List<PlayMode> availableModes = [PlayMode.normal, PlayMode.repeat];
 
     return Card(
       color: theme.colorScheme.card,
@@ -60,7 +54,6 @@ class PlaybackModeControlWidget extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 현재 재생 모드 표시
                 Row(
                   children: [
                     Icon(
@@ -84,11 +77,10 @@ class PlaybackModeControlWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                // 모드 변경 버튼들
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final mode in PlayMode.values)
+                    for (final mode in availableModes)
                       Padding(
                         padding: const EdgeInsets.only(left: 2),
                         child: IconButton(

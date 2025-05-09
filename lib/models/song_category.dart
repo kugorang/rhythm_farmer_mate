@@ -1,10 +1,21 @@
+import 'package:hive/hive.dart';
+
+part 'song_category.g.dart'; // Hive generator가 생성할 파일
+
 // ignore_for_file: public_member_api_docs, sort_constructors_first
+@HiveType(typeId: 1) // HiveType 어노테이션 추가 및 고유 typeId 지정 (Song과 다른 ID)
 enum SongCategoryType {
+  @HiveField(0)
   traditionalNongyo1, // 농요[1] - 논고르기 / 모찌기 / 모심기 / 기타 농요
+  @HiveField(1)
   traditionalNongyo2, // 농요[2] - 논매기(1)
+  @HiveField(2)
   traditionalNongyo3, // 농요[3] - 논매기(2) / 벼베기 / 벼타작 / 물푸기 / 기타
+  @HiveField(3)
   traditionalNongyo4, // 농요[4] - 밭갈이 / 밭매기 / 보리타작 / 풀베기 / 말몰이 / 기타
+  @HiveField(4)
   modernLaborSong, // 현대 노동요
+  @HiveField(5)
   userRegistered, // 내가 등록한 노래
 }
 
