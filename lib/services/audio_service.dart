@@ -105,15 +105,24 @@ class AudioService {
     bool beatOn = false;
     _bpmTimer = Timer.periodic(Duration(milliseconds: beatInterval), (timer) {
       beatOn = !beatOn;
+
+      // 비트 상태 변경 콜백 호출
       if (onMetronomeTick != null) {
         onMetronomeTick!(beatOn);
       }
 
       // 소리 활성화된 경우 메트로놈 소리 재생
-      if (_isMetronomeSoundEnabled &&
-          _metronomePlayer.processingState == ProcessingState.ready) {
-        _metronomePlayer.seek(Duration.zero);
-        _metronomePlayer.play();
+      if (beatOn && _isMetronomeSoundEnabled) {
+        // 메트로놈 소리는 비트가 시작될 때만 재생 (beatOn == true)
+        if (_metronomePlayer.processingState == ProcessingState.ready) {
+          try {
+            // 소리 재생 전 위치 초기화
+            _metronomePlayer.seek(Duration.zero);
+            _metronomePlayer.play();
+          } catch (e) {
+            debugPrint('메트로놈 소리 재생 오류: $e');
+          }
+        }
       }
     });
   }
