@@ -306,8 +306,8 @@ class _MyHomePageState extends State<MyHomePage> {
       if (mounted)
         ShadToaster.of(context).show(
           ShadToast(
-            title: const Text('오류'),
-            description: const Text('음악 파일 정보를 로드 중입니다.'),
+            title: const Text('알림'),
+            description: const Text('음악을 불러오는 중입니다. 잠시만 기다려주세요.'),
           ),
         );
       return;
@@ -360,8 +360,8 @@ class _MyHomePageState extends State<MyHomePage> {
     if (completed && mounted) {
       ShadToaster.of(context).show(
         ShadToast(
-          title: const Text('챌린지 성공!'),
-          description: const Text('잘 하셨어요! 🎉'),
+          title: const Text('작업 완료!'),
+          description: const Text('오늘도 수고 많으셨습니다! 🎉'),
         ),
       );
     }
@@ -390,7 +390,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_isTimerRunning && mounted) {
       ShadToaster.of(
         context,
-      ).show(ShadToast(description: const Text('작업 중에는 BPM을 변경할 수 없습니다.')));
+      ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
       return;
     }
     setState(() {
@@ -422,7 +422,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_isTimerRunning && mounted) {
       ShadToaster.of(
         context,
-      ).show(ShadToast(description: const Text('작업 중 BPM 변경 불가')));
+      ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
       return;
     }
     setState(() {
@@ -453,7 +453,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_isTimerRunning && mounted) {
       ShadToaster.of(
         context,
-      ).show(ShadToast(description: const Text('작업 중 곡 변경 불가')));
+      ).show(ShadToast(description: const Text('지금은 작업 중이라 노래를 바꿀 수 없어요.')));
       return;
     }
     if (mounted)
@@ -481,19 +481,15 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_isTimerRunning && mounted) {
       ShadToaster.of(
         context,
-      ).show(ShadToast(description: const Text('작업 중에는 박자를 맞출 수 없습니다.')));
+      ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
       return;
     }
-
     final now = DateTime.now();
-    if (mounted) {
+    if (mounted)
       setState(() {
         _tapTimestamps.add(now);
       });
-    }
-
     _tapTempoResetTimer?.cancel();
-
     if (_tapTimestamps.length >= _minTapsForBpm) {
       List<int> intervals = [];
       for (int i = 0; i < _tapTimestamps.length - 1; i++) {
@@ -537,11 +533,12 @@ class _MyHomePageState extends State<MyHomePage> {
           _bpmChangedByTap = true; // 시각적 피드백 활성화
         });
         if (mounted) {
-          ShadToaster.of(
-            context,
-          ).show(ShadToast(description: Text('박자 설정됨: $_currentManualBpm')));
+          ShadToaster.of(context).show(
+            ShadToast(
+              description: Text('현재 박자가 $_currentManualBpm (으)로 설정되었어요.'),
+            ),
+          );
         }
-        // 짧은 시간 후 시각적 피드백 비활성화
         Timer(const Duration(milliseconds: 500), () {
           if (mounted)
             setState(() {
@@ -553,20 +550,21 @@ class _MyHomePageState extends State<MyHomePage> {
         if (mounted)
           ShadToaster.of(
             context,
-          ).show(ShadToast(description: const Text('일정한 간격으로 탭해주세요.')));
+          ).show(ShadToast(description: const Text('엇, 박자가 안 맞네요. 다시 탭해주세요.')));
         _tapTimestamps.clear();
       }
     } else {
       _tapTempoResetTimer = Timer(_tapTempoTimeout, () {
         if (_tapTimestamps.isNotEmpty &&
             _tapTimestamps.length < _minTapsForBpm) {
-          if (mounted) {
+          if (mounted)
             ShadToaster.of(context).show(
               ShadToast(
-                description: Text('탭 횟수가 부족합니다. (최소 ${_minTapsForBpm}번)'),
+                description: Text(
+                  '박자 계산에 필요한 탭 횟수가 부족해요. (최소 ${_minTapsForBpm}번)',
+                ),
               ),
             );
-          }
         }
         if (mounted)
           setState(() {
@@ -574,7 +572,6 @@ class _MyHomePageState extends State<MyHomePage> {
           });
       });
     }
-    // 탭할 때마다 버튼 텍스트 업데이트를 위해 setState 호출
     if (mounted) setState(() {});
   }
 
@@ -814,7 +811,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       child: ShadButton(
                         size: ShadButtonSize.lg,
                         child: Text(
-                          '여기를 탭하여 박자 입력 (${_tapTimestamps.length})',
+                          '탭하여 박자 입력 (${_tapTimestamps.length}번 탭)',
                           style: theme.textTheme.p.copyWith(
                             color: theme.colorScheme.primaryForeground,
                           ),
