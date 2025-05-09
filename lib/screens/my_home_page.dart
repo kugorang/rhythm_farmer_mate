@@ -8,6 +8,7 @@ import '../widgets/bpm_control_section_widget.dart'; // 상대 경로
 import '../widgets/music_control_widget.dart'; // 상대 경로
 import '../widgets/progress_display_widget.dart'; // ProgressDisplayWidget import 추가
 import '../widgets/challenge_control_button_widget.dart'; // ChallengeControlButtonWidget import 추가
+import 'package:rhythm_farmer_mate/my_app.dart'; // themeModeNotifier 접근을 위해 추가 (또는 별도 파일로 분리)
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -699,6 +700,29 @@ class _MyHomePageState extends State<MyHomePage> {
               color: theme.colorScheme.primaryForeground,
             ),
             onPressed: _showMetronomeSettingsDialog, // 설정 다이얼로그 호출
+          ),
+          // 라이트/다크 모드 전환 버튼 추가
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeModeNotifier, // my_app.dart에 정의된 notifier
+            builder: (context, currentMode, child) {
+              return ShadButton.ghost(
+                icon: Icon(
+                  currentMode == ThemeMode.dark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  color: theme.colorScheme.primaryForeground,
+                ),
+                onPressed: () {
+                  themeModeNotifier.value =
+                      currentMode == ThemeMode.light
+                          ? ThemeMode.dark
+                          : currentMode == ThemeMode.dark
+                          ? ThemeMode.system
+                          : ThemeMode
+                              .light; // Light -> Dark -> System -> Light 순환
+                },
+              );
+            },
           ),
         ],
       ),

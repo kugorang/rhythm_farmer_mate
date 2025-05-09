@@ -4,6 +4,11 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:rhythm_farmer_mate/screens/splash_screen.dart';
 import 'package:rhythm_farmer_mate/screens/my_home_page.dart';
 
+// ThemeMode 상태를 위한 ValueNotifier
+final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
+  ThemeMode.system,
+);
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -17,28 +22,35 @@ class MyApp extends StatelessWidget {
       small: const TextStyle(fontSize: 12 * 1.1),
       large: const TextStyle(fontSize: 18 * 1.1),
     );
-    return ShadApp.material(
-      title: '리듬농부 메이트',
-      theme: ShadThemeData(
-        brightness: Brightness.light,
-        // 이전 논의에서 최종적으로 ShadZincColorScheme 사용하기로 함
-        colorScheme: const ShadZincColorScheme.light(),
-        radius: BorderRadius.circular(6.0),
-        textTheme: appTextTheme,
-      ),
-      darkTheme: ShadThemeData(
-        brightness: Brightness.dark,
-        colorScheme: const ShadZincColorScheme.dark(),
-        radius: BorderRadius.circular(6.0),
-        textTheme: appTextTheme,
-      ),
-      themeMode: ThemeMode.system,
-      debugShowCheckedModeBanner: false,
-      builder: (context, child) => ShadToaster(child: child!),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const SplashScreen(),
-        '/home': (context) => const MyHomePage(),
+
+    // ValueListenableBuilder를 사용하여 themeModeNotifier의 변경을 감지하고 앱을 다시 빌드
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return ShadApp.material(
+          title: '리듬농부 메이트',
+          theme: ShadThemeData(
+            brightness: Brightness.light,
+            // 이전 논의에서 최종적으로 ShadZincColorScheme 사용하기로 함
+            colorScheme: const ShadZincColorScheme.light(),
+            radius: BorderRadius.circular(6.0),
+            textTheme: appTextTheme,
+          ),
+          darkTheme: ShadThemeData(
+            brightness: Brightness.dark,
+            colorScheme: const ShadZincColorScheme.dark(),
+            radius: BorderRadius.circular(6.0),
+            textTheme: appTextTheme,
+          ),
+          themeMode: currentMode, // ValueNotifier의 현재 값 사용
+          debugShowCheckedModeBanner: false,
+          builder: (context, child) => ShadToaster(child: child!),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const SplashScreen(),
+            '/home': (context) => const MyHomePage(),
+          },
+        );
       },
     );
   }
