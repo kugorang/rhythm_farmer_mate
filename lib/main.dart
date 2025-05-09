@@ -41,6 +41,10 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isTimerRunning = false;
   double _progressPercent = 0.0;
 
+  Timer? _bpmTimer;
+  final int _currentBpm = 120; // 예시 BPM 값
+  bool _beatHighlighter = false;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +85,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     _audioPlayer.dispose();
     _timer?.cancel();
+    _bpmTimer?.cancel(); // BPM 타이머 리소스 해제
     super.dispose();
   }
 
@@ -132,6 +137,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       _isTimerRunning = true;
+      _beatHighlighter = false; // 시작 시 초기화
     });
     _audioPlayer.play();
 
@@ -148,13 +154,25 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     });
+
+    // BPM 타이머 시작
+    final beatInterval = (60000 / _currentBpm).round(); // 밀리초 단위
+    _bpmTimer = Timer.periodic(Duration(milliseconds: beatInterval), (timer) {
+      if (mounted) {
+        setState(() {
+          _beatHighlighter = !_beatHighlighter;
+        });
+      }
+    });
   }
 
   void _stopTimer({bool completed = false}) {
     _timer?.cancel();
+    _bpmTimer?.cancel(); // BPM 타이머 정지
     if (mounted) {
       setState(() {
         _isTimerRunning = false;
+        _beatHighlighter = false; // 정지 시 초기화
         if (completed) {
           _progressPercent = 1.0;
           _remainingTime = Duration.zero;
@@ -206,13 +224,15 @@ class _MyHomePageState extends State<MyHomePage> {
               Container(
                 height: 50,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color:
+                      _beatHighlighter ? Colors.amberAccent : Colors.grey[300],
+                  // 간단한 깜빡임 효과. 추후 애니메이션으로 개선 가능
                   borderRadius: BorderRadius.circular(8.0),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'BPM 리듬 표시기 (예: 아이콘)',
-                    style: TextStyle(fontSize: 16),
+                    'BPM: $_currentBpm',
+                    style: const TextStyle(fontSize: 16, color: Colors.black54),
                   ),
                 ),
               ),
