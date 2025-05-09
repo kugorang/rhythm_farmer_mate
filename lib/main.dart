@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -31,14 +32,21 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late AudioPlayer _audioPlayer;
   bool _isPlaying = false;
-  String _currentSongTitle = '논삶는소리 (강원 홍천군)';
-  Duration? _duration;
+  final String _currentSongTitle = '논삶는소리 (강원 홍천군)';
+  Duration? _audioDuration;
+
+  Timer? _timer;
+  Duration _remainingTime = const Duration(seconds: 0);
+  String _timerText = '00:00';
+  bool _isTimerRunning = false;
+  double _progressPercent = 0.0;
 
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
     _initAudioPlayer();
+    _updateTimerText();
   }
 
   Future<void> _initAudioPlayer() async {
@@ -47,7 +55,12 @@ class _MyHomePageState extends State<MyHomePage> {
       _audioPlayer.durationStream.listen((duration) {
         if (mounted) {
           setState(() {
-            _duration = duration;
+            _audioDuration = duration;
+            if (!_isTimerRunning && _audioDuration != null) {
+              _remainingTime = _audioDuration!;
+              _updateTimerText();
+              _updateProgress();
+            }
           });
         }
       });
@@ -67,7 +80,95 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  void _updateTimerText() {
+    final minutes = _remainingTime.inMinutes
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final seconds = _remainingTime.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    if (mounted) {
+      setState(() {
+        _timerText = '$minutes:$seconds';
+      });
+    }
+  }
+
+  void _updateProgress() {
+    if (_audioDuration != null && _audioDuration!.inSeconds > 0) {
+      final elapsedTime = _audioDuration!.inSeconds - _remainingTime.inSeconds;
+      if (mounted) {
+        setState(() {
+          _progressPercent = elapsedTime / _audioDuration!.inSeconds;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _progressPercent = 0.0;
+        });
+      }
+    }
+  }
+
+  void _startTimer() {
+    if (_isTimerRunning) return;
+
+    if (_audioDuration != null) {
+      _remainingTime = _audioDuration!;
+    } else {
+      if (_audioDuration == null) {
+        print("오디오 정보가 아직 로드되지 않았습니다.");
+      }
+    }
+    _updateTimerText();
+    _updateProgress();
+
+    setState(() {
+      _isTimerRunning = true;
+    });
+    _audioPlayer.play();
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingTime.inSeconds <= 0) {
+        _stopTimer(completed: true);
+      } else {
+        if (mounted) {
+          setState(() {
+            _remainingTime = _remainingTime - const Duration(seconds: 1);
+            _updateTimerText();
+            _updateProgress();
+          });
+        }
+      }
+    });
+  }
+
+  void _stopTimer({bool completed = false}) {
+    _timer?.cancel();
+    if (mounted) {
+      setState(() {
+        _isTimerRunning = false;
+        if (completed) {
+          _progressPercent = 1.0;
+          _remainingTime = Duration.zero;
+        } else if (_audioDuration != null) {
+          _updateProgress();
+        }
+      });
+    }
+    _audioPlayer.pause();
+    if (completed) {
+      print('작업 완료!');
+      if (_audioDuration != null) {}
+    }
+    _updateTimerText();
   }
 
   @override
@@ -90,10 +191,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(8.0),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    '00:00', // Placeholder for timer
-                    style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+                    _timerText,
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -115,13 +219,17 @@ class _MyHomePageState extends State<MyHomePage> {
               const SizedBox(height: 20),
 
               LinearProgressIndicator(
-                value: 0.5, // Placeholder
+                value: _progressPercent,
                 minHeight: 20,
                 backgroundColor: Colors.grey[300],
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
               ),
               const SizedBox(height: 10),
-              const Center(child: Text('진행도: 50%')), // Placeholder
+              Center(
+                child: Text(
+                  '진행도: ${(_progressPercent * 100).toStringAsFixed(0)}%',
+                ),
+              ),
               const SizedBox(height: 20),
 
               Container(
@@ -174,11 +282,31 @@ class _MyHomePageState extends State<MyHomePage> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  backgroundColor:
+                      _isTimerRunning
+                          ? Colors.redAccent
+                          : Theme.of(context).primaryColor,
                 ),
                 onPressed: () {
-                  // TODO: 작업 시작/중지 로직
+                  if (_isTimerRunning) {
+                    _stopTimer();
+                  } else {
+                    if (_audioDuration != null &&
+                        (_remainingTime.inSeconds == 0 ||
+                            _remainingTime != _audioDuration)) {
+                      setState(() {
+                        _remainingTime = _audioDuration!;
+                        _progressPercent = 0.0;
+                        _updateTimerText();
+                      });
+                    }
+                    _startTimer();
+                  }
                 },
-                child: const Text('작업 시작', style: TextStyle(fontSize: 20)),
+                child: Text(
+                  _isTimerRunning ? '작업 중지' : '작업 시작',
+                  style: const TextStyle(fontSize: 20, color: Colors.white),
+                ),
               ),
             ],
           ),
