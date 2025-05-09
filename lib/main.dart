@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 void main() {
   runApp(const MyApp());
@@ -28,6 +29,47 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  late AudioPlayer _audioPlayer;
+  bool _isPlaying = false;
+  String _currentSongTitle = '논삶는소리 (강원 홍천군)';
+  Duration? _duration;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _initAudioPlayer();
+  }
+
+  Future<void> _initAudioPlayer() async {
+    try {
+      await _audioPlayer.setAsset('assets/audio/se0101.mp3');
+      _audioPlayer.durationStream.listen((duration) {
+        if (mounted) {
+          setState(() {
+            _duration = duration;
+          });
+        }
+      });
+    } catch (e) {
+      print("Error loading audio source: $e");
+    }
+
+    _audioPlayer.playingStream.listen((playing) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = playing;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,7 +84,6 @@ class _MyHomePageState extends State<MyHomePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // TODO: 타이머 표시 영역
               Container(
                 padding: const EdgeInsets.all(16.0),
                 decoration: BoxDecoration(
@@ -58,7 +99,6 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               const SizedBox(height: 20),
 
-              // TODO: BPM 리듬 표시기 영역
               Container(
                 height: 50,
                 decoration: BoxDecoration(
@@ -74,7 +114,6 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               const SizedBox(height: 20),
 
-              // TODO: 진행 바 영역
               LinearProgressIndicator(
                 value: 0.5, // Placeholder
                 minHeight: 20,
@@ -85,7 +124,6 @@ class _MyHomePageState extends State<MyHomePage> {
               const Center(child: Text('진행도: 50%')), // Placeholder
               const SizedBox(height: 20),
 
-              // TODO: 음악 정보 및 재생 제어 버튼 영역
               Container(
                 padding: const EdgeInsets.all(16.0),
                 decoration: BoxDecoration(
@@ -94,9 +132,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 child: Column(
                   children: [
-                    const Text(
-                      '현재 재생 중: 노동요 제목 (Placeholder)',
-                      style: TextStyle(
+                    Text(
+                      '현재 재생 중: $_currentSongTitle',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -106,17 +144,24 @@ class _MyHomePageState extends State<MyHomePage> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.play_arrow),
+                          icon: Icon(
+                            _isPlaying ? Icons.pause : Icons.play_arrow,
+                          ),
                           iconSize: 48,
                           onPressed: () {
-                            // TODO: Play/Pause 로직
+                            if (_isPlaying) {
+                              _audioPlayer.pause();
+                            } else {
+                              _audioPlayer.play();
+                            }
                           },
                         ),
                         IconButton(
                           icon: const Icon(Icons.stop),
                           iconSize: 48,
                           onPressed: () {
-                            // TODO: Stop 로직
+                            _audioPlayer.stop();
+                            _audioPlayer.seek(Duration.zero);
                           },
                         ),
                       ],
@@ -126,7 +171,6 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               const SizedBox(height: 20),
 
-              // TODO: 작업 시작/중지 버튼
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
