@@ -153,14 +153,11 @@ class MyApp extends StatelessWidget {
           ),
           debugShowCheckedModeBanner: false,
           builder: (context, child) => ShadToaster(child: child!),
-          initialRoute: '/category-selection', // 초기 라우트를 변경
+          initialRoute: '/', // 초기 라우트를 다시 SplashScreen으로 변경
           routes: {
-            '/':
-                (context) =>
-                    const SplashScreen(), // 스플래시를 유지하고 싶다면, 스플래시에서 /category-selection으로 이동
+            '/': (context) => const SplashScreen(),
             '/category-selection': (context) => const CategorySelectionScreen(),
-            // '/home': (context) => const MyHomePage(), // MyHomePage는 이제 직접 Song 객체를 받아야 함
-            // MyHomePage 라우트를 유지하고 싶다면 onGenerateRoute 사용 필요
+            // MyHomePage는 CategorySelectionScreen에서 context.push/Navigator.push로 호출됨
           },
         );
       },

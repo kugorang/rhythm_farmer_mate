@@ -67,12 +67,90 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
       subCategory: '모찌기',
     ),
     Song(
+      filePath: 'assets/audio/se0201.mp3',
+      title: '논매는소리-"헤헤 곯었네" (경기 안성군)',
+      bpm: 52,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0202.mp3',
+      title: '논매는소리-대허리 (경기 이천군)',
+      bpm: 115,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0203.mp3',
+      title: '논매는소리-오독떼기 (강원 양양군)',
+      bpm: 107,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0204.mp3',
+      title: '논매는소리-"얼카 덩어리" (충남 홍성군)',
+      bpm: 62,
+      categoryType: SongCategoryType.traditionalNongyo2,
+      subCategory: '논매기(1)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0301.mp3',
+      title: '논매는소리-긴소리/들래기소리 (전남 무안군)',
+      bpm: 66,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '논매기(2)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0302.mp3',
+      title: '논매는소리-소오니소리 (경북 구미시)',
+      bpm: 55,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '논매기(2)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0303.mp3',
+      title: '논매는소리 (경북 예천군)',
+      bpm: 78,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '논매기(2)',
+    ),
+    Song(
+      filePath: 'assets/audio/se0304.mp3',
+      title: '농사장원례소리-애롱대롱 (전남 나주군)',
+      bpm: 91,
+      categoryType: SongCategoryType.traditionalNongyo3,
+      subCategory: '기타',
+    ),
+    Song(
+      filePath: 'assets/audio/se0401.mp3',
+      title: '밭가는소리 (강원 홍천군)',
+      bpm: 132,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
+    ),
+    Song(
+      filePath: 'assets/audio/se0402.mp3',
+      title: '밭일구는소리(따비질) (제주 북제주군)',
+      bpm: 72,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
+    ),
+    Song(
+      filePath: 'assets/audio/se0403.mp3',
+      title: '밭고르는소리(곰방메질) (제주 북제주군)',
+      bpm: 64,
+      categoryType: SongCategoryType.traditionalNongyo4,
+      subCategory: '밭갈이',
+    ),
+    Song(
       filePath: 'assets/audio/se0404.mp3',
       title: '밭밟는소리 (제주 북제주군)',
       bpm: 69,
       categoryType: SongCategoryType.traditionalNongyo4,
       subCategory: '밭갈이',
     ),
+    // Song(filePath: 'assets/audio/tick.mp3', title: '메트로놈 틱', bpm: 0, categoryType: SongCategoryType.modernLaborSong), // 메트로놈 삭제로 제거
   ];
 
   @override
@@ -465,30 +543,25 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
               children: [
                 ShadButton(
                   size: ShadButtonSize.sm,
+                  variant:
+                      _selectedCategoryType == null
+                          ? ShadButtonVariant.primary
+                          : ShadButtonVariant.outline,
                   onPressed: () {
                     setState(() {
                       _selectedCategoryType = null;
                     });
                   },
-                  child: Text(
-                    '전체',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                          _selectedCategoryType == null
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                      color:
-                          _selectedCategoryType == null
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.foreground,
-                    ),
-                  ),
+                  child: const Text('전체', style: TextStyle(fontSize: 14)),
                 ),
                 ...categories.map((category) {
                   final isSelected = _selectedCategoryType == category.type;
                   return ShadButton(
                     size: ShadButtonSize.sm,
+                    variant:
+                        isSelected
+                            ? ShadButtonVariant.primary
+                            : ShadButtonVariant.outline,
                     onPressed: () {
                       setState(() {
                         _selectedCategoryType = category.type;
@@ -496,15 +569,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                     },
                     child: Text(
                       category.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color:
-                            isSelected
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.foreground,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
+                      style: const TextStyle(fontSize: 14),
                     ),
                   );
                 }).toList(),
