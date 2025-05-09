@@ -91,6 +91,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late AudioPlayer _metronomePlayer; // 메트로놈용 오디오 플레이어
   bool _isPlaying = false;
   Duration? _audioDuration;
+  bool _isLoadingSong = true; // 로딩 상태 변수 추가
 
   Timer? _timer;
   Duration _remainingTime = const Duration(seconds: 0);
@@ -122,30 +123,66 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _selectedSong = _songList.first;
-    _currentManualBpm = _selectedSong.bpm; // 초기 BPM 설정
+    _currentManualBpm = _selectedSong.bpm;
     _audioPlayer = AudioPlayer();
-    _metronomePlayer = AudioPlayer(); // 메트로놈 플레이어 초기화
-    _initAudioPlayers();
+    _metronomePlayer = AudioPlayer();
+    _initAudioPlayers(); // 내부에서 _isLoadingSong = false 처리
     _updateTimerText();
   }
 
   Future<void> _initAudioPlayers() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingSong = true;
+      });
+    }
     try {
       await _audioPlayer.setAsset(_selectedSong.filePath);
-      await _metronomePlayer.setAsset('assets/audio/tick.mp3'); // 메트로놈 사운드 로드
+      await _metronomePlayer.setAsset('assets/audio/tick.mp3');
 
       _audioPlayer.durationStream.listen((duration) {
         if (mounted) {
           setState(() {
             _audioDuration = duration;
             if (!_isTimerRunning && _audioDuration != null) {
-              _remainingTime = _audioDuration!;
+              _remainingTime = Duration(
+                seconds:
+                    (_audioDuration!.inSeconds / _currentPlaybackSpeed).round(),
+              );
               _updateTimerText();
               _updateProgress();
             }
+            // _isLoadingSong = false; // 여기서 false로 하면 durationStream이 여러번 호출될 수 있음
           });
         }
       });
+
+      // durationStream이 안정적으로 첫 값을 받을 때까지 기다리거나, 최초 로드 완료 시점으로 이동
+      // 또는 setAsset 완료 후 바로 로딩 완료로 간주 (duration은 나중에 업데이트)
+      // 여기서는 setAsset 완료 후 로딩 완료로 처리하고, duration은 비동기 업데이트되도록 함.
+      if (mounted) {
+        // 약간의 딜레이를 주어 durationStream이 첫 값을 받을 기회를 줌 (이상적인 방법은 아님)
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() {
+              _isLoadingSong = false;
+              // 만약 이때 _audioDuration이 아직 null이면, 기본값이나 초기화 필요
+              if (_audioDuration == null && _audioPlayer.duration != null) {
+                _audioDuration = _audioPlayer.duration; // 직접 가져오기 시도
+                if (!_isTimerRunning && _audioDuration != null) {
+                  _remainingTime = Duration(
+                    seconds:
+                        (_audioDuration!.inSeconds / _currentPlaybackSpeed)
+                            .round(),
+                  );
+                  _updateTimerText();
+                  _updateProgress();
+                }
+              }
+            });
+          }
+        });
+      }
 
       _audioPlayer.playingStream.listen((playing) {
         if (mounted) {
@@ -389,6 +426,11 @@ class _MyHomePageState extends State<MyHomePage> {
       );
       return;
     }
+    if (mounted) {
+      setState(() {
+        _isLoadingSong = true; // 곡 변경 시작 시 로딩 상태로
+      });
+    }
 
     setState(() {
       _selectedSong = newSong;
@@ -403,7 +445,7 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     await _audioPlayer.stop();
     _bpmTimer?.cancel(); // 이전 곡의 BPM 타이머 중지
-    await _initAudioPlayers(); // 내부에서 setAsset, setSpeed(1.0) 호출됨
+    await _initAudioPlayers(); // 내부에서 로딩 완료 처리
     // _initAudioPlayers 후 _audioDuration 로드되면 _remainingTime 등 자동 업데이트됨
   }
 
@@ -433,7 +475,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    if (!_isTimerRunning)
+                    // 로딩 인디케이터 추가
+                    if (_isLoadingSong)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    if (!_isTimerRunning && !_isLoadingSong) // 로딩 중 아닐 때만 표시
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
                         child: DropdownButtonFormField<Song>(
@@ -444,6 +492,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                             filled: true,
                             fillColor: Colors.grey.shade100,
+                            enabled: !_isLoadingSong, // 로딩 중 비활성화
                           ),
                           value: _selectedSong,
                           items:
@@ -456,11 +505,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                   ),
                                 );
                               }).toList(),
-                          onChanged: (Song? newValue) {
-                            if (newValue != null) {
-                              _onSongChanged(newValue);
-                            }
-                          },
+                          onChanged:
+                              _isLoadingSong
+                                  ? null
+                                  : (Song? newValue) {
+                                    // 로딩 중 변경 방지
+                                    if (newValue != null) {
+                                      _onSongChanged(newValue);
+                                    }
+                                  },
                           isExpanded: true,
                         ),
                       ),
@@ -473,16 +526,29 @@ class _MyHomePageState extends State<MyHomePage> {
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade400),
                         borderRadius: BorderRadius.circular(12.0),
+                        color:
+                            _isLoadingSong
+                                ? Colors.grey.shade200
+                                : Colors.white, // 로딩 중 배경색 변경
                       ),
                       child: Center(
-                        child: Text(
-                          _timerText,
-                          style: const TextStyle(
-                            fontSize: 60,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
+                        child:
+                            _isLoadingSong
+                                ? const Text(
+                                  "노래 로딩 중...",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                                : Text(
+                                  _timerText,
+                                  style: const TextStyle(
+                                    fontSize: 60,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -496,29 +562,40 @@ class _MyHomePageState extends State<MyHomePage> {
                           iconSize: 30,
                           color: Colors.blueGrey,
                           onPressed:
-                              _isTimerRunning
+                              _isTimerRunning || _isLoadingSong
                                   ? null
-                                  : () => _changeBpm(-5), // 작업 중에는 BPM 변경 불가
+                                  : () => _changeBpm(-5),
                         ),
                         Expanded(
                           child: Container(
                             height: 60,
                             decoration: BoxDecoration(
                               color:
-                                  _beatHighlighter
-                                      ? Colors.amberAccent.shade100
-                                      : Colors.grey.shade200,
+                                  _isLoadingSong
+                                      ? Colors.grey.shade200
+                                      : (_beatHighlighter
+                                          ? Colors.amberAccent.shade100
+                                          : Colors.grey.shade200),
                               borderRadius: BorderRadius.circular(12.0),
                             ),
                             child: Center(
-                              child: Text(
-                                'BPM: $_currentManualBpm', // _selectedSong.bpm -> _currentManualBpm
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                              child:
+                                  _isLoadingSong
+                                      ? const Text(
+                                        "--",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.grey,
+                                        ),
+                                      )
+                                      : Text(
+                                        'BPM: $_currentManualBpm',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.grey.shade700,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
                             ),
                           ),
                         ),
@@ -527,16 +604,16 @@ class _MyHomePageState extends State<MyHomePage> {
                           iconSize: 30,
                           color: Colors.blueGrey,
                           onPressed:
-                              _isTimerRunning
+                              _isTimerRunning || _isLoadingSong
                                   ? null
-                                  : () => _changeBpm(5), // 작업 중에는 BPM 변경 불가
+                                  : () => _changeBpm(5),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
 
                     LinearProgressIndicator(
-                      value: _progressPercent,
+                      value: _isLoadingSong ? 0 : _progressPercent, // 로딩 중 0%
                       minHeight: 25,
                       backgroundColor: Colors.grey.shade300,
                       valueColor: AlwaysStoppedAnimation<Color>(
@@ -547,7 +624,9 @@ class _MyHomePageState extends State<MyHomePage> {
                     const SizedBox(height: 12),
                     Center(
                       child: Text(
-                        '진행도: ${(_progressPercent * 100).toStringAsFixed(0)}%',
+                        _isLoadingSong
+                            ? '로딩 중...'
+                            : '진행도: ${(_progressPercent * 100).toStringAsFixed(0)}%',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey.shade700,
@@ -562,11 +641,17 @@ class _MyHomePageState extends State<MyHomePage> {
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12.0),
+                        color:
+                            _isLoadingSong
+                                ? Colors.grey.shade100
+                                : Colors.white,
                       ),
                       child: Column(
                         children: [
                           Text(
-                            '현재 재생 중: ${_selectedSong.title}',
+                            _isLoadingSong
+                                ? '로딩 중...'
+                                : '현재 재생 중: ${_selectedSong.title}',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 18,
@@ -574,7 +659,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               color: Colors.black87,
                             ),
                           ),
-                          if (_audioDuration != null) // 재생 속도 표시 추가
+                          if (!_isLoadingSong &&
+                              _audioDuration != null) // 로딩 중 아닐 때만 표시
                             Text(
                               '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (BPM: ${_selectedSong.bpm} -> $_currentManualBpm)',
                               style: TextStyle(
@@ -594,20 +680,22 @@ class _MyHomePageState extends State<MyHomePage> {
                                   color: Theme.of(context).primaryColor,
                                 ),
                                 iconSize: 60,
-                                onPressed: () {
-                                  if (_audioDuration == null) return;
-                                  if (_isPlaying) {
-                                    _audioPlayer.pause();
-                                    // _bpmTimer?.cancel(); // 음악만 일시정지 시 BPM 시각화/소리도 멈출지 결정
-                                  } else {
-                                    _audioPlayer.setSpeed(
-                                      _currentPlaybackSpeed,
-                                    ); // 재생 시 현재 속도 적용
-                                    _audioPlayer.play();
-                                    if (!_isTimerRunning)
-                                      _restartBpmTimer(); // 작업 타이머가 안 돌고 있을 때만 BPM 타이머 별도 시작/재시작
-                                  }
-                                },
+                                onPressed:
+                                    _isLoadingSong || _audioDuration == null
+                                        ? null
+                                        : () {
+                                          // 로딩 중 또는 오디오 준비 안되면 비활성화
+                                          if (_isPlaying) {
+                                            _audioPlayer.pause();
+                                          } else {
+                                            _audioPlayer.setSpeed(
+                                              _currentPlaybackSpeed,
+                                            );
+                                            _audioPlayer.play();
+                                            if (!_isTimerRunning)
+                                              _restartBpmTimer();
+                                          }
+                                        },
                               ),
                               IconButton(
                                 icon: Icon(
@@ -615,13 +703,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                   color: Colors.red.shade700,
                                 ),
                                 iconSize: 60,
-                                onPressed: () {
-                                  if (_audioDuration == null) return;
-                                  _audioPlayer.stop();
-                                  _audioPlayer.seek(Duration.zero);
-                                  // _bpmTimer?.cancel(); // 음악 정지 시 BPM 시각화/소리도 멈출지 결정
-                                  // setState(() { _isPlaying = false; _beatHighlighter = false; }); // 수동으로 상태 반영 필요시
-                                },
+                                onPressed:
+                                    _isLoadingSong || _audioDuration == null
+                                        ? null
+                                        : () {
+                                          // 로딩 중 또는 오디오 준비 안되면 비활성화
+                                          _audioPlayer.stop();
+                                          _audioPlayer.seek(Duration.zero);
+                                        },
                               ),
                             ],
                           ),
@@ -636,7 +725,11 @@ class _MyHomePageState extends State<MyHomePage> {
                         backgroundColor:
                             _isTimerRunning
                                 ? Colors.red.shade400
-                                : Theme.of(context).colorScheme.primary,
+                                : (_isLoadingSong
+                                    ? Colors.grey
+                                    : Theme.of(
+                                      context,
+                                    ).colorScheme.primary), // 로딩 중 회색
                         foregroundColor: Colors.white,
                         textStyle: const TextStyle(
                           fontSize: 22,
@@ -646,33 +739,49 @@ class _MyHomePageState extends State<MyHomePage> {
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                       ),
-                      onPressed: () {
-                        if (_isTimerRunning) {
-                          _stopTimers();
-                        } else {
-                          if (_audioDuration != null &&
-                              (_remainingTime.inSeconds == 0 ||
-                                  _remainingTime.inSeconds.toDouble() !=
-                                      (_audioDuration!.inSeconds /
-                                              _currentPlaybackSpeed)
-                                          .round())) {
-                            setState(() {
-                              // 작업 시작 시, 현재 재생속도에 맞춰 _remainingTime 다시 계산
-                              _remainingTime = Duration(
-                                seconds:
-                                    (_audioDuration!.inSeconds /
-                                            _currentPlaybackSpeed)
-                                        .round(),
-                              );
-                              _progressPercent = 0.0;
-                              _updateTimerText();
-                            });
-                          }
-                          _startTimers();
-                        }
-                      },
+                      onPressed:
+                          _isLoadingSong
+                              ? null
+                              : () {
+                                // 로딩 중 비활성화
+                                if (_isTimerRunning) {
+                                  _stopTimers();
+                                } else {
+                                  if (_audioDuration != null &&
+                                      (_remainingTime.inSeconds == 0 ||
+                                          _remainingTime.inSeconds.toDouble() !=
+                                              (_audioDuration!.inSeconds /
+                                                      _currentPlaybackSpeed)
+                                                  .round())) {
+                                    setState(() {
+                                      _remainingTime = Duration(
+                                        seconds:
+                                            (_audioDuration!.inSeconds /
+                                                    _currentPlaybackSpeed)
+                                                .round(),
+                                      );
+                                      _progressPercent = 0.0;
+                                      _updateTimerText();
+                                    });
+                                  }
+                                  if (_audioDuration == null) {
+                                    // 추가 방어 코드
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          '노래 정보를 아직 불러오지 못했습니다. 잠시 후 시도해주세요.',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  _startTimers();
+                                }
+                              },
                       child: Text(
-                        _isTimerRunning ? '작업 중지' : '작업 시작',
+                        _isLoadingSong
+                            ? '노래 로딩 중...'
+                            : (_isTimerRunning ? '작업 중지' : '작업 시작'),
                         style: const TextStyle(
                           fontSize: 20,
                           color: Colors.white,
