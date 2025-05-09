@@ -1,10 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../models/song_category.dart';
-import './my_home_page.dart'; // MyHomePage로 이동하기 위함
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
-class CategorySelectionScreen extends StatelessWidget {
+import '../models/song_category.dart';
+import '../models/song.dart';
+import './my_home_page.dart';
+
+class CategorySelectionScreen extends StatefulWidget {
   const CategorySelectionScreen({super.key});
+
+  @override
+  State<CategorySelectionScreen> createState() =>
+      _CategorySelectionScreenState();
+}
+
+class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
+  List<Song> _userRegisteredSongs = [];
+
+  Future<void> _pickAndAddUserSong() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final filePath = result.files.single.path!;
+        final fileName = result.files.single.name;
+        final newSong = Song(
+          filePath: filePath,
+          title: fileName.split('.').first,
+          bpm: 0,
+          categoryType: SongCategoryType.userRegistered,
+        );
+
+        if (mounted) {
+          setState(() {
+            _userRegisteredSongs.add(newSong);
+          });
+          ShadToaster.of(context).show(
+            ShadToast(
+              title: const Text('노래 추가됨'),
+              description: Text('${newSong.title} 이(가) 목록에 추가되었습니다.'),
+            ),
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => MyHomePage(
+                    selectedCategoryType: SongCategoryType.userRegistered,
+                    userSongs: List.from(_userRegisteredSongs),
+                  ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ShadToaster.of(context).show(
+            ShadToast(
+              title: const Text('알림'),
+              description: const Text('파일이 선택되지 않았습니다.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('파일 선택 오류: $e');
+      if (mounted) {
+        ShadToaster.of(context).show(
+          ShadToast(
+            title: const Text('오류'),
+            description: const Text('파일을 불러오는 중 오류가 발생했습니다.'),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,20 +107,19 @@ class CategorySelectionScreen extends StatelessWidget {
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 if (category.type == SongCategoryType.userRegistered) {
-                  // TODO: "내가 등록한 노래" 기능 구현 (예: 로컬 파일 선택)
-                  ShadToaster.of(context).show(
-                    ShadToast(
-                      title: const Text('알림'),
-                      description: const Text('이 기능은 곧 준비될 예정입니다!'),
-                    ),
-                  );
+                  _pickAndAddUserSong();
                 } else {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder:
-                          (context) =>
-                              MyHomePage(selectedCategoryType: category.type),
+                          (context) => MyHomePage(
+                            selectedCategoryType: category.type,
+                            userSongs:
+                                category.type == SongCategoryType.userRegistered
+                                    ? List.from(_userRegisteredSongs)
+                                    : [],
+                          ),
                     ),
                   );
                 }

@@ -20,9 +20,14 @@ enum PlayMode {
 }
 
 class MyHomePage extends StatefulWidget {
-  final SongCategoryType? selectedCategoryType; // 선택된 카테고리 타입 추가
+  final SongCategoryType? selectedCategoryType;
+  final List<Song>? userSongs; // 사용자가 추가한 곡 목록 파라미터
 
-  const MyHomePage({super.key, this.selectedCategoryType}); // 생성자 수정
+  const MyHomePage({
+    super.key,
+    this.selectedCategoryType,
+    this.userSongs, // 생성자에 추가
+  });
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -187,26 +192,39 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
 
-    // 선택된 카테고리에 따라 곡 목록 필터링
-    if (widget.selectedCategoryType != null) {
+    // 선택된 카테고리에 따라 곡 목록 필터링 또는 사용자 곡 로드
+    if (widget.selectedCategoryType == SongCategoryType.userRegistered &&
+        widget.userSongs != null &&
+        widget.userSongs!.isNotEmpty) {
+      _filteredSongList = List.from(widget.userSongs!);
+    } else if (widget.selectedCategoryType != null) {
       _filteredSongList =
           _fullSongList
               .where((song) => song.categoryType == widget.selectedCategoryType)
               .toList();
     } else {
-      // 카테고리가 선택되지 않은 경우 (예: 직접 MyHomePage로 접근 시) 모든 곡을 보여주거나 기본 카테고리 설정
       _filteredSongList = List.from(_fullSongList);
+    }
+
+    // 만약 userRegistered 카테고리인데 userSongs가 비어있거나 null이면, 모든 곡을 보여주거나 특정 메시지 표시 가능
+    if (widget.selectedCategoryType == SongCategoryType.userRegistered &&
+        _filteredSongList.isEmpty) {
+      // 예: 사용자에게 곡을 추가하라는 안내를 HomeContentWidget 등을 통해 표시
+      // 여기서는 일단 비어있는 목록으로 시작하고, 사용자가 추가하면 목록이 채워짐
+      // 또는 _fullSongList에서 userRegistered 카테고리만 필터링 할 수도 있으나, CategorySelectionScreen에서 관리하므로 여기서는 전달받은 userSongs를 우선
     }
 
     _currentSongIndex = 0;
     _selectedSong =
         _filteredSongList.isNotEmpty
             ? _filteredSongList[_currentSongIndex]
-            : const Song(
+            : Song(
               filePath: '',
               title: '노래 없음',
               bpm: 0,
-              categoryType: SongCategoryType.modernLaborSong, // 기본값
+              categoryType:
+                  widget.selectedCategoryType ??
+                  SongCategoryType.modernLaborSong,
             );
     _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
 
