@@ -151,6 +151,10 @@ class _MyHomePageState extends State<MyHomePage> {
   late int _currentManualBpm; // 사용자가 조절하는 BPM
   double _currentPlaybackSpeed = 1.0; // 현재 재생 속도
 
+  static const int slowBpm = 60;
+  static const int normalBpm = 90;
+  static const int fastBpm = 120;
+
   @override
   void initState() {
     super.initState();
@@ -376,6 +380,38 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _changeBpmToPreset(int presetBpm) {
+    if (_isTimerRunning && mounted) {
+      ShadToaster.of(
+        context,
+      ).show(ShadToast(description: const Text('작업 중에는 BPM을 변경할 수 없습니다.')));
+      return;
+    }
+    setState(() {
+      _currentManualBpm = presetBpm.clamp(30, 240);
+      final songBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
+      _currentPlaybackSpeed =
+          (songBpm == 0) ? 1.0 : (_currentManualBpm / songBpm).clamp(0.5, 2.0);
+      _audioPlayer.setSpeed(
+        _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
+      );
+
+      if (_isTimerRunning || _isPlaying || (_bpmTimer?.isActive ?? false)) {
+        _restartBpmTimer();
+      }
+      if (!_isTimerRunning && _audioDuration != null) {
+        _remainingTime = Duration(
+          seconds:
+              (_audioDuration!.inSeconds /
+                      (_currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0))
+                  .round(),
+        );
+        _updateTimerText();
+        _updateProgress();
+      }
+    });
+  }
+
   void _changeBpm(int delta) {
     if (_isTimerRunning && mounted) {
       ShadToaster.of(
@@ -386,21 +422,20 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       int newBpm = (_currentManualBpm + delta).clamp(30, 240);
       _currentManualBpm = newBpm;
-      if (_selectedSong.bpm == 0) {
-        // Prevent division by zero
-        _currentPlaybackSpeed = 1.0;
-      } else {
-        _currentPlaybackSpeed = (_currentManualBpm / _selectedSong.bpm).clamp(
-          0.5,
-          2.0,
-        );
-      }
-      _audioPlayer.setSpeed(_currentPlaybackSpeed);
+      final songBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
+      _currentPlaybackSpeed =
+          (songBpm == 0) ? 1.0 : (_currentManualBpm / songBpm).clamp(0.5, 2.0);
+      _audioPlayer.setSpeed(
+        _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
+      );
       if (_isTimerRunning || _isPlaying || (_bpmTimer?.isActive ?? false))
         _restartBpmTimer();
       if (!_isTimerRunning && _audioDuration != null) {
         _remainingTime = Duration(
-          seconds: (_audioDuration!.inSeconds / _currentPlaybackSpeed).round(),
+          seconds:
+              (_audioDuration!.inSeconds /
+                      (_currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0))
+                  .round(),
         );
         _updateTimerText();
         _updateProgress();
@@ -439,26 +474,44 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final defaultBorderRadius = theme.radius; // 테마의 BorderRadius 객체 직접 사용
-
-    // BPM 비트에 따른 스케일 값 결정
+    final defaultBorderRadius = theme.radius;
     final bpmIndicatorScale = _beatHighlighter ? 1.1 : 1.0;
-    // BPM 비트에 따른 배경색 결정
     final bpmIndicatorColor =
         _isLoadingSong
             ? theme.colorScheme.muted
             : (_beatHighlighter
-                ? theme.colorScheme.primary.withOpacity(0.3) // 좀 더 강조된 색상
+                ? theme.colorScheme.primary.withOpacity(0.3)
                 : theme.colorScheme.card);
-    // BPM 비트에 따른 텍스트 색상 결정
     final bpmTextColor =
         _isLoadingSong
             ? theme.colorScheme.mutedForeground
             : (_beatHighlighter
-                ? theme
-                    .colorScheme
-                    .primary // 강조된 텍스트 색상
+                ? theme.colorScheme.primary
                 : theme.colorScheme.foreground);
+
+    Widget buildBpmPresetButton(String label, int presetBpm) {
+      final isSelected = _currentManualBpm == presetBpm;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: ShadButton.outline(
+          size: ShadButtonSize.sm,
+          child: Text(
+            label,
+            style: theme.textTheme.p.copyWith(
+              color:
+                  isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.foreground.withOpacity(0.7),
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          onPressed:
+              _isTimerRunning || _isLoadingSong
+                  ? null
+                  : () => _changeBpmToPreset(presetBpm),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -554,7 +607,16 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        buildBpmPresetButton('느리게', slowBpm),
+                        buildBpmPresetButton('보통', normalBpm),
+                        buildBpmPresetButton('빠르게', fastBpm),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -607,7 +669,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                         ),
                                       )
                                       : Text(
-                                        'BPM: $_currentManualBpm',
+                                        '속도: $_currentManualBpm',
                                         style: theme.textTheme.p.copyWith(
                                           color: bpmTextColor,
                                           fontWeight: FontWeight.bold,
@@ -633,21 +695,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      tween: Tween<double>(
-                        begin: 0,
-                        end: _isLoadingSong ? 0 : _progressPercent * 100,
-                      ),
-                      builder: (context, value, child) {
-                        return ShadProgress(
-                          value: value,
-                          minHeight: 12,
-                          color: theme.colorScheme.primary,
-                          backgroundColor: theme.colorScheme.muted,
-                        );
-                      },
+                    ShadProgress(
+                      value: _isLoadingSong ? 0 : _progressPercent * 100,
+                      minHeight: 12,
+                      color: theme.colorScheme.primary,
+                      backgroundColor: theme.colorScheme.muted,
                     ),
                     const SizedBox(height: 12),
                     Center(
@@ -687,8 +739,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               padding: const EdgeInsets.only(top: 4.0),
                               child: Text(
                                 _currentPlaybackSpeed == 1.0
-                                    ? "(원곡 속도, BPM: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'})"
-                                    : '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (BPM: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'} -> $_currentManualBpm)',
+                                    ? "(원곡 속도, 현재 속도: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'})"
+                                    : '재생 속도: ${_currentPlaybackSpeed.toStringAsFixed(1)}x (원곡 속도: ${_selectedSong.bpm > 0 ? _selectedSong.bpm : 'N/A'} -> 현재 속도: $_currentManualBpm)',
                                 style: theme.textTheme.small.copyWith(
                                   color: theme.colorScheme.mutedForeground,
                                 ),
@@ -766,19 +818,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     const SizedBox(height: 30),
                     ShadButton(
                       size: ShadButtonSize.lg,
-                      icon: Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Icon(
-                          _isTimerRunning
-                              ? Icons.stop_rounded
-                              : Icons.play_arrow_rounded,
-                          size: (theme.textTheme.large.fontSize ?? 18) * 1.1,
-                          color:
-                              _isTimerRunning
-                                  ? theme.colorScheme.destructiveForeground
-                                  : theme.colorScheme.primaryForeground,
-                        ),
-                      ),
                       child: Text(
                         _isLoadingSong
                             ? '노래 로딩 중...'
