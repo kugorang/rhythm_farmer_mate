@@ -13,17 +13,36 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 폰트 크기 직접 지정
+    final appTextTheme = ShadTextTheme(
+      h1: const TextStyle(
+        fontSize: 60 * 1.05,
+        fontWeight: FontWeight.bold,
+      ), // 타이머 크기
+      h2: const TextStyle(fontSize: 30 * 1.1, fontWeight: FontWeight.bold),
+      h4: const TextStyle(
+        fontSize: 18 * 1.1,
+        fontWeight: FontWeight.w600,
+      ), // 카드 내 제목 등
+      p: const TextStyle(fontSize: 15 * 1.15), // 본문/일반 텍스트 (기본 14 또는 15 가정)
+      small: const TextStyle(fontSize: 12 * 1.1), // 작은 텍스트
+      large: const TextStyle(fontSize: 18 * 1.1), // 큰 텍스트 (버튼 등)
+      // ShadButton 내부 Text는 이 테마를 따르거나, child Text에 직접 스타일 적용 필요
+    );
+
     return ShadApp.material(
       title: '리듬농부 메이트',
       theme: ShadThemeData(
         brightness: Brightness.light,
-        colorScheme: const ShadSlateColorScheme.light(), // 구체적인 색상 스킴 명시
-        // radius: ShadRadius.md, // 테마 radius 설정 제거 또는 고정값 사용
+        colorScheme: const ShadSlateColorScheme.light(),
+        radius: BorderRadius.circular(6.0), // 고정값 사용 또는 ShadRadius.md 사용 가능시 변경
+        textTheme: appTextTheme,
       ),
       darkTheme: ShadThemeData(
         brightness: Brightness.dark,
-        colorScheme: const ShadSlateColorScheme.dark(), // 구체적인 색상 스킴 명시
-        // radius: ShadRadius.md,
+        colorScheme: const ShadSlateColorScheme.dark(),
+        radius: BorderRadius.circular(6.0),
+        textTheme: appTextTheme,
       ),
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
@@ -420,7 +439,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final defaultBorderRadius = BorderRadius.circular(6.0);
+    final defaultBorderRadius = theme.radius; // 테마의 BorderRadius 객체 직접 사용
 
     // BPM 비트에 따른 스케일 값 결정
     final bpmIndicatorScale = _beatHighlighter ? 1.1 : 1.0;
@@ -446,9 +465,9 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: theme.colorScheme.primary,
         title: Text(
           '리듬농부 메이트',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
+          style: theme.textTheme.h4.copyWith(
             color: theme.colorScheme.primaryForeground,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
@@ -479,7 +498,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         child: ShadSelect<Song>(
                           placeholder: Text(
                             '노동요를 선택하세요',
-                            style: TextStyle(
+                            style: theme.textTheme.p.copyWith(
                               color: theme.colorScheme.mutedForeground,
                             ),
                           ),
@@ -531,7 +550,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                   style: theme.textTheme.h1.copyWith(
                                     fontFamily: 'monospace',
                                     color: theme.colorScheme.foreground,
-                                    fontSize: 60,
                                   ),
                                 ),
                       ),
@@ -543,7 +561,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.remove_circle_outline),
-                          iconSize: 28,
+                          iconSize: 30,
                           color: theme.colorScheme.foreground,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -600,7 +618,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.add_circle_outline),
-                          iconSize: 28,
+                          iconSize: 30,
                           color: theme.colorScheme.foreground,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -680,14 +698,17 @@ class _MyHomePageState extends State<MyHomePage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              ShadButton.ghost(
+                              IconButton(
                                 icon: Icon(
                                   _isPlaying
                                       ? Icons.pause_circle
                                       : Icons.play_circle_outline,
                                   color: theme.colorScheme.primary,
-                                  size: 48,
+                                  size: 52,
                                 ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                splashRadius: 30,
                                 onPressed:
                                     _isLoadingSong || _audioDuration == null
                                         ? null
@@ -706,12 +727,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                           }
                                         },
                               ),
-                              ShadButton.ghost(
-                                icon: Icon(
-                                  Icons.stop_circle_outlined,
-                                  color: theme.colorScheme.destructive,
-                                  size: 48,
-                                ),
+                              IconButton(
+                                icon: const Icon(Icons.stop_circle_outlined),
+                                iconSize: 52,
+                                color: theme.colorScheme.destructive,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                splashRadius: 30,
                                 onPressed:
                                     _isLoadingSong || _audioDuration == null
                                         ? null
@@ -732,6 +754,12 @@ class _MyHomePageState extends State<MyHomePage> {
                         _isLoadingSong
                             ? '노래 로딩 중...'
                             : (_isTimerRunning ? '작업 중지' : '작업 시작'),
+                        style: theme.textTheme.large.copyWith(
+                          color:
+                              _isTimerRunning
+                                  ? theme.colorScheme.destructiveForeground
+                                  : theme.colorScheme.primaryForeground,
+                        ),
                       ),
                       onPressed:
                           _isLoadingSong
