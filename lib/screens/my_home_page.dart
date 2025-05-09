@@ -317,29 +317,29 @@ class _MyHomePageState extends State<MyHomePage> {
         _audioDuration != null &&
         _audioDuration!.inSeconds > 0 &&
         _currentPlaybackSpeed > 0) {
+      // 챌린지 실행 중 - 진행도 계산
       final totalDurationAdjustedInSeconds =
           _audioDuration!.inSeconds / _currentPlaybackSpeed;
+
       if (totalDurationAdjustedInSeconds > 0) {
         final double elapsedTimeInSeconds =
             totalDurationAdjustedInSeconds -
             _remainingTime.inSeconds.toDouble();
         newProgress = (elapsedTimeInSeconds / totalDurationAdjustedInSeconds);
 
-        if (newProgress < 0) newProgress = 0.0;
-        if (newProgress > 1) newProgress = 1.0;
-        if (newProgress < 0.000001 && newProgress > 0)
-          newProgress = 0.0; // 아주 작은 값 보정
-        if (newProgress > 0.999999 && newProgress < 1)
-          newProgress = 1.0; // 거의 1에 가까운 값 보정
+        // 값 범위 보정
+        newProgress = newProgress.clamp(0.0, 1.0);
+
+        // 아주 작은 값 처리 (정밀도 이슈)
+        if (newProgress < 0.000001) newProgress = 0.0;
+        if (newProgress > 0.999999) newProgress = 1.0;
       } else {
         newProgress = _remainingTime.inSeconds == 0 ? 1.0 : 0.0;
       }
     } else if (!_isChallengeRunning && _progressPercent != 0) {
-      // 챌린지가 실행 중이 아닐 때는 현재 진행도를 유지 (0으로 리셋하지 않음)
-      // 단, _progressPercent가 이미 0이 아닌 경우에만 해당
+      // 챌린지 실행 중이 아니고 이미 진행된 상태 - 현재 진행도 유지
       newProgress = _progressPercent;
     }
-    // 챌린지가 아니고, _progressPercent도 0이면 newProgress는 0.0으로 유지됨
 
     setState(() {
       _progressPercent = newProgress;
@@ -347,80 +347,89 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _startChallenge() {
+    // 이미 챌린지 실행 중이거나 오디오가 로드되지 않았으면 무시
     if (_isChallengeRunning) return;
     if (_audioDuration == null) {
-      if (mounted)
+      if (mounted) {
         ShadToaster.of(context).show(
           ShadToast(
             title: const Text('알림'),
             description: const Text('음악을 불러오는 중입니다.'),
           ),
         );
+      }
       return;
     }
+
+    // 챌린지 시작 준비
     _remainingTime = Duration(
-      seconds:
-          (_audioDuration!.inSeconds /
-                  (_currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0))
-              .round(),
+      seconds: (_audioDuration!.inSeconds / _currentPlaybackSpeed).round(),
     );
     _updateTimerText();
 
     setState(() {
       _isChallengeRunning = true;
       _beatHighlighter = false;
+      _progressPercent = 0.0;
     });
 
-    if (mounted) {
-      _updateProgress();
-    }
+    _updateProgress();
 
-    _audioService.setSpeed(
-      _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
-    );
+    // 재생 시작 및 타이머 설정
+    _audioService.setSpeed(_currentPlaybackSpeed);
     _audioService.play();
+
+    // 1초마다 타이머 갱신
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
+
       if (_remainingTime.inSeconds <= 0) {
         _stopChallenge(completed: true);
       } else {
-        _remainingTime = _remainingTime - const Duration(seconds: 1);
+        setState(() {
+          _remainingTime = _remainingTime - const Duration(seconds: 1);
+        });
         _updateTimerText();
         _updateProgress();
       }
     });
+
+    // BPM 타이머 시작
     _restartBpmTimer();
   }
 
   void _stopChallenge({bool completed = false}) {
     _timer?.cancel();
+
     if (mounted) {
       setState(() {
         _isChallengeRunning = false;
         if (completed) {
           _progressPercent = 1.0;
           _remainingTime = Duration.zero;
-        } else {
-          // 챌린지 중단 시 현재 진행도 유지 (위 _updateProgress에서 처리)
         }
       });
-      _updateProgress(); // 상태 변경 후 진행도 다시 계산하여 반영
+
+      _updateProgress();
+      _audioService.pause();
+
+      // 메트로놈 정지
+      _audioService.stopBpmTicker();
+
+      if (completed) {
+        ShadToaster.of(context).show(
+          ShadToast(
+            title: const Text('작업 완료!'),
+            description: const Text('오늘도 수고 많으셨습니다! 🎉'),
+          ),
+        );
+      }
+
+      _updateTimerText();
     }
-    _audioService.pause();
-    _bpmAdjustTimer?.cancel();
-    if (mounted) setState(() => _beatHighlighter = false);
-    if (completed && mounted) {
-      ShadToaster.of(context).show(
-        ShadToast(
-          title: const Text('작업 완료!'),
-          description: const Text('오늘도 수고 많으셨습니다! 🎉'),
-        ),
-      );
-    }
-    _updateTimerText();
   }
 
   void _restartBpmTimer() {
@@ -440,90 +449,129 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _updateBpmAndPlaybackSpeed(int newBpm) {
     if (!mounted) return;
+
+    final clampedBpm = newBpm.clamp(30, 240);
+    final songOriginalBpm =
+        _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
+    final newPlaybackSpeed =
+        songOriginalBpm > 0
+            ? (clampedBpm / songOriginalBpm).clamp(0.5, 2.0)
+            : 1.0;
+
     setState(() {
-      _currentManualBpm = newBpm.clamp(30, 240);
-      final songOriginalBpm =
-          _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
-      _currentPlaybackSpeed =
-          (songOriginalBpm == 0)
-              ? 1.0
-              : (_currentManualBpm / songOriginalBpm).clamp(0.5, 2.0);
-      _audioService.setSpeed(
-        _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
-      );
-      if ((_isPlaying && !_isChallengeRunning) || _isChallengeRunning)
-        _restartBpmTimer();
-      if (!_isChallengeRunning && _audioDuration != null) {
+      _currentManualBpm = clampedBpm;
+      _currentPlaybackSpeed = newPlaybackSpeed;
+    });
+
+    // 오디오 재생 속도 변경
+    _audioService.setSpeed(_currentPlaybackSpeed);
+
+    // 재생 중이면 BPM 타이머 재시작
+    if ((_isPlaying && !_isChallengeRunning) || _isChallengeRunning) {
+      _restartBpmTimer();
+    }
+
+    // 챌린지 중이 아니면 타이머 시간 업데이트
+    if (!_isChallengeRunning && _audioDuration != null) {
+      setState(() {
         _remainingTime = Duration(
-          seconds:
-              (_audioDuration!.inSeconds /
-                      (_currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0))
-                  .round(),
+          seconds: (_audioDuration!.inSeconds / _currentPlaybackSpeed).round(),
         );
         _progressPercent = 0.0;
-        _updateTimerText();
-        _updateProgress();
-      }
-    });
+      });
+
+      _updateTimerText();
+      _updateProgress();
+    }
   }
 
   void _changeBpmToPreset(int presetBpm) {
-    if (_isChallengeRunning && mounted) {
-      ShadToaster.of(
-        context,
-      ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
+    // 챌린지 중에는 변경 금지
+    if (_isChallengeRunning) {
+      if (mounted) {
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
+      }
       return;
     }
+
     _updateBpmAndPlaybackSpeed(presetBpm);
   }
 
   void _changeBpm(int delta) {
-    if (_isChallengeRunning && mounted) {
-      ShadToaster.of(
-        context,
-      ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
+    // 챌린지 중에는 변경 금지
+    if (_isChallengeRunning) {
+      if (mounted) {
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
+      }
       return;
     }
+
     _updateBpmAndPlaybackSpeed(_currentManualBpm + delta);
   }
 
   void _handleTapForBpm() {
-    if (_isChallengeRunning && mounted) {
-      ShadToaster.of(
-        context,
-      ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
+    // 챌린지 중에는 변경 금지
+    if (_isChallengeRunning) {
+      if (mounted) {
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: const Text('지금은 작업 중이라 박자를 바꿀 수 없어요.')));
+      }
       return;
     }
+
+    // 현재 시간 기록
     final now = DateTime.now();
-    if (mounted) {
-      if (_tapTimestamps.length >= _minTapsForBpm) _tapTimestamps.removeAt(0);
-      setState(() {
-        _tapTimestamps.add(now);
-      });
+
+    // 탭 시간 저장 (최대 _minTapsForBpm 개만 유지)
+    if (_tapTimestamps.length >= _minTapsForBpm) {
+      _tapTimestamps.removeAt(0);
     }
+
+    setState(() {
+      _tapTimestamps.add(now);
+    });
+
+    // 기존 타이머 취소
     _tapTempoResetTimer?.cancel();
+
+    // 충분한 탭이 기록되었으면 BPM 계산
     if (_tapTimestamps.length >= _minTapsForBpm) {
       final intervalMs =
           _tapTimestamps[1].difference(_tapTimestamps[0]).inMilliseconds;
+
+      // 적절한 간격 범위인지 확인 (30~240 BPM)
       if (intervalMs > 250 && intervalMs < 2000) {
-        // 유효한 탭 간격 (30 ~ 240 BPM)
         final newBpm = (60000 / intervalMs).round();
         _updateBpmAndPlaybackSpeed(newBpm);
+
         if (mounted) {
           ShadToaster.of(context).show(
             ShadToast(
               description: Text('현재 박자가 $_currentManualBpm (으)로 설정되었어요.'),
             ),
           );
+
+          // 탭 하이라이트 효과
+          setState(() {
+            _bpmChangedByTap = true;
+          });
+
+          // 하이라이트 효과 해제 타이머
+          Timer(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              setState(() {
+                _bpmChangedByTap = false;
+              });
+            }
+          });
         }
-        Timer(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            setState(() {
-              _bpmChangedByTap = false;
-            });
-          }
-        });
       } else {
+        // 유효하지 않은 BPM 범위
         if (mounted) {
           ShadToaster.of(context).show(
             ShadToast(
@@ -533,6 +581,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     } else {
+      // 시간 초과 후 탭 기록 초기화 타이머
       _tapTempoResetTimer = Timer(_tapTempoTimeout, () {
         if (_tapTimestamps.isNotEmpty &&
             _tapTimestamps.length < _minTapsForBpm &&
@@ -543,6 +592,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           );
         }
+
         if (mounted) {
           setState(() {
             _tapTimestamps.clear();
@@ -550,7 +600,6 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       });
     }
-    if (mounted) setState(() {});
   }
 
   void _handlePlaybackCompletion() async {
@@ -665,16 +714,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _startBpmAdjustTimer(int delta) {
     _bpmAdjustTimer?.cancel();
-    _changeBpm(delta); // 세부 BPM 변경 함수 호출
-    _bpmAdjustTimer = Timer.periodic(const Duration(milliseconds: 150), (
-      timer,
-    ) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      _changeBpm(delta);
-    });
+    _changeBpm(delta); // 첫 번째 변경 즉시 반영
+
+    // 버튼 계속 누르고 있을 때 일정 간격으로 BPM 조정
+    _bpmAdjustTimer = Timer.periodic(
+      const Duration(milliseconds: 150),
+      (_) => _changeBpm(delta),
+    );
   }
 
   void _stopBpmAdjustTimer() {
