@@ -1,65 +1,21 @@
 import 'package:flutter/material.dart'
     hide BorderStyle; // BoxDecoration, Border, BorderRadius는 사용
-import 'package:just_audio/just_audio.dart';
-import 'dart:async';
-import 'package:shadcn_ui/shadcn_ui.dart'; // shadcn_ui import
+import 'package:just_audio/just_audio.dart'; // 주석 해제
+import 'dart:async'; // 주석 해제
+import 'package:shadcn_ui/shadcn_ui.dart'; // 주석 해제
 import 'models/song.dart'; // Song 모델 import
 import 'screens/splash_screen.dart'; // SplashScreen 위젯 import
-import 'widgets/timer_display_widget.dart'; // TimerDisplayWidget import 추가
-import 'widgets/bpm_control_section_widget.dart'; // BpmControlSectionWidget import 추가
-import 'widgets/music_control_widget.dart'; // MusicControlWidget import 추가
+import 'widgets/timer_display_widget.dart'; // 우선 유지 또는 my_home_page.dart로 이동 예정
+import 'widgets/bpm_control_section_widget.dart'; // 우선 유지 또는 my_home_page.dart로 이동 예정
+import 'widgets/music_control_widget.dart'; // 우선 유지 또는 my_home_page.dart로 이동 예정
+import 'package:rhythm_farmer_mate/my_app.dart'; // MyApp import
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // 폰트 크기 직접 지정
-    final appTextTheme = ShadTextTheme(
-      h1: const TextStyle(
-        fontSize: 60 * 1.05,
-        fontWeight: FontWeight.bold,
-      ), // 타이머 크기
-      h2: const TextStyle(fontSize: 30 * 1.1, fontWeight: FontWeight.bold),
-      h4: const TextStyle(
-        fontSize: 18 * 1.1,
-        fontWeight: FontWeight.w600,
-      ), // 카드 내 제목 등
-      p: const TextStyle(fontSize: 15 * 1.15), // 본문/일반 텍스트 (기본 14 또는 15 가정)
-      small: const TextStyle(fontSize: 12 * 1.1), // 작은 텍스트
-      large: const TextStyle(fontSize: 18 * 1.1), // 큰 텍스트 (버튼 등)
-      // ShadButton 내부 Text는 이 테마를 따르거나, child Text에 직접 스타일 적용 필요
-    );
-
-    return ShadApp.material(
-      title: '리듬농부 메이트',
-      theme: ShadThemeData(
-        brightness: Brightness.light,
-        colorScheme: const ShadZincColorScheme.light(),
-        radius: BorderRadius.circular(6.0), // 고정값 사용 또는 ShadRadius.md 사용 가능시 변경
-        textTheme: appTextTheme,
-      ),
-      darkTheme: ShadThemeData(
-        brightness: Brightness.dark,
-        colorScheme: const ShadZincColorScheme.dark(),
-        radius: BorderRadius.circular(6.0),
-        textTheme: appTextTheme,
-      ),
-      themeMode: ThemeMode.system,
-      debugShowCheckedModeBanner: false,
-      builder: (context, child) => ShadToaster(child: child!),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const SplashScreen(),
-        '/home': (context) => const MyHomePage(),
-      },
-    );
-  }
-}
+// MyApp 클래스 정의 삭제
+// class MyApp extends StatelessWidget { ... }
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
