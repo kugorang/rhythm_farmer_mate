@@ -1,14 +1,22 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart' hide BorderStyle;
 import 'package:just_audio/just_audio.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../models/song.dart'; // 상대 경로 또는 package:rhythm_farmer_mate/models/song.dart
-import '../widgets/timer_display_widget.dart'; // 상대 경로
-import '../widgets/bpm_control_section_widget.dart'; // 상대 경로
-import '../widgets/music_control_widget.dart'; // 상대 경로
-import '../widgets/progress_display_widget.dart'; // ProgressDisplayWidget import 추가
-import '../widgets/challenge_control_button_widget.dart'; // ChallengeControlButtonWidget import 추가
+import '../widgets/home_content_widget.dart'; // 새로 추가된 위젯
 import 'package:rhythm_farmer_mate/my_app.dart'; // themeModeNotifier 접근을 위해 추가 (또는 별도 파일로 분리)
+import '../widgets/playlist_dialog_widget.dart'; // 새로 추가된 위젯
+import '../widgets/metronome_settings_dialog_widget.dart'; // 새로 추가된 위젯
+import '../services/audio_service.dart'; // AudioService 추가
+
+// 재생 모드 정의
+enum PlayMode {
+  normal, // 기본 재생 (한 곡 재생 후 정지)
+  repeat, // 한 곡 반복 재생
+  allSongs, // 전체 목록 순차 재생
+  shuffle, // 랜덤 재생
+}
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -18,9 +26,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late AudioPlayer _audioPlayer;
-  late AudioPlayer _metronomePlayer;
-  bool _isPlaying = false; // _audioPlayer.playing 상태 반영
+  late AudioService _audioService; // AudioPlayer 대신 AudioService 사용
+  bool _isPlaying = false;
   Duration? _audioDuration;
   bool _isLoadingSong = true;
   Timer? _timer; // 작업(챌린지) 타이머
@@ -28,9 +35,13 @@ class _MyHomePageState extends State<MyHomePage> {
   String _timerText = '00:00';
   bool _isChallengeRunning = false; // << 핵심 상태 변수: 작업(챌린지) 실행 여부
   double _progressPercent = 0.0;
-  Timer? _bpmTimer;
   bool _beatHighlighter = false;
   bool _isMetronomeSoundEnabled = true; // 메트로놈 소리 활성화 여부 상태
+
+  // 재생 모드 상태 변수
+  PlayMode _playMode = PlayMode.normal;
+  final Random _random = Random();
+  int _currentSongIndex = 0;
 
   static const int slowBpm = 60;
   static const int normalBpm = 90;
@@ -137,80 +148,46 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    _currentSongIndex = 0; // 초기 인덱스 설정
     _selectedSong =
         _songList.isNotEmpty
-            ? _songList.first
+            ? _songList[_currentSongIndex] // 초기 인덱스로 곡 선택
             : const Song(filePath: '', title: '노래 없음', bpm: 0);
-    _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
-    _audioPlayer = AudioPlayer();
-    _metronomePlayer = AudioPlayer();
+    _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
+
+    // AudioService 초기화 및 콜백 설정
+    _audioService = AudioService();
+    _setupAudioServiceCallbacks();
+
     if (_selectedSong.filePath.isNotEmpty) {
-      _initAudioPlayers();
+      _initAudioService();
     } else {
       if (mounted) setState(() => _isLoadingSong = false);
     }
     _updateTimerText();
   }
 
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    _metronomePlayer.dispose();
-    _timer?.cancel();
-    _bpmTimer?.cancel();
-    _tapTempoResetTimer?.cancel();
-    _bpmAdjustTimer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _initAudioPlayers() async {
-    if (mounted) {
-      setState(() {
-        _isLoadingSong = true;
-      });
-    }
-    try {
-      await _audioPlayer.setAsset(_selectedSong.filePath);
-      if (_metronomePlayer.processingState == ProcessingState.idle) {
-        try {
-          await _metronomePlayer.setAsset('assets/audio/tick.mp3');
-        } catch (e) {
-          print("Metronome tick load error: $e");
-          if (mounted) {
-            ShadToaster.of(context).show(
-              ShadToast(
-                title: const Text('오류'),
-                description: const Text('메트로놈 효과음 로드 실패!'),
-              ),
-            );
-          }
+  void _setupAudioServiceCallbacks() {
+    // 콜백 설정
+    _audioService.onPlayingStateChanged = (isPlaying) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = isPlaying;
+        });
+      }
+      if (!_isChallengeRunning) {
+        if (isPlaying) {
+          _restartBpmTimer();
+        } else {
+          if (mounted) setState(() => _beatHighlighter = false);
         }
       }
-      _audioPlayer.durationStream.listen((duration) {
-        if (mounted) {
-          setState(() {
-            _audioDuration = duration;
-            if (!_isChallengeRunning && _audioDuration != null) {
-              _remainingTime = Duration(
-                seconds:
-                    (_audioDuration!.inSeconds /
-                            (_currentPlaybackSpeed > 0
-                                ? _currentPlaybackSpeed
-                                : 1.0))
-                        .round(),
-              );
-              _updateTimerText();
-              _progressPercent = 0.0;
-              _updateProgress();
-            }
-          });
-        }
-      });
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          if (_audioPlayer.duration != null) {
-            _audioDuration = _audioPlayer.duration;
-          }
+    };
+
+    _audioService.onDurationChanged = (duration) {
+      if (mounted) {
+        setState(() {
+          _audioDuration = duration;
           if (!_isChallengeRunning && _audioDuration != null) {
             _remainingTime = Duration(
               seconds:
@@ -224,34 +201,88 @@ class _MyHomePageState extends State<MyHomePage> {
             _progressPercent = 0.0;
             _updateProgress();
           }
-          setState(() {
-            _isLoadingSong = false;
-          });
-        }
+        });
+      }
+    };
+
+    _audioService.onError = (errorMessage) {
+      if (mounted) {
+        ShadToaster.of(context).show(
+          ShadToast(title: const Text('오류'), description: Text(errorMessage)),
+        );
+      }
+    };
+
+    _audioService.onMetronomeTick = (beatOn) {
+      if (mounted) {
+        setState(() {
+          _beatHighlighter = beatOn;
+        });
+      }
+    };
+
+    _audioService.onCompletion = () {
+      if (!_isChallengeRunning) {
+        _handlePlaybackCompletion();
+      }
+    };
+  }
+
+  @override
+  void dispose() {
+    _audioService.dispose();
+    _timer?.cancel();
+    _tapTempoResetTimer?.cancel();
+    _bpmAdjustTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initAudioService() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingSong = true;
       });
-      _audioPlayer.playingStream.listen((playing) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = playing;
-          });
+    }
+
+    try {
+      // 현재 선택된 곡 로드
+      await _audioService.loadSong(_selectedSong, context);
+
+      // 약간의 딜레이 후 duration을 다시 확인 (웹 플랫폼에서 초기 로드 시 duration이 null일 수 있음)
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+
+        if (_audioService.duration != null) {
+          _audioDuration = _audioService.duration;
         }
-        // 챌린지 중이 아닐 때만, 음악 재생 상태에 따라 BPM 타이머(시각화) 제어
-        if (!_isChallengeRunning) {
-          if (playing) {
-            _restartBpmTimer();
-          } else {
-            _bpmTimer?.cancel();
-            if (mounted) setState(() => _beatHighlighter = false);
-          }
+
+        // 챌린지 중이 아니고, duration이 정상적으로 로드되었을 때 타이머와 진행도 업데이트
+        if (!_isChallengeRunning && _audioDuration != null) {
+          _remainingTime = Duration(
+            seconds:
+                (_audioDuration!.inSeconds /
+                        (_currentPlaybackSpeed > 0
+                            ? _currentPlaybackSpeed
+                            : 1.0))
+                    .round(),
+          );
+          _updateTimerText();
+          _progressPercent = 0.0;
+          _updateProgress();
         }
+
+        setState(() {
+          _isLoadingSong = false;
+        });
       });
-      await _audioPlayer.setSpeed(
+
+      await _audioService.setSpeed(
         _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
       );
     } catch (e) {
-      print("Error in _initAudioPlayers: $e");
-      if (mounted) setState(() => _isLoadingSong = false);
+      print("Error in _initAudioService: $e");
       if (mounted) {
+        setState(() => _isLoadingSong = false);
         ShadToaster.of(context).show(
           ShadToast(
             title: const Text('오류'),
@@ -296,14 +327,20 @@ class _MyHomePageState extends State<MyHomePage> {
 
         if (newProgress < 0) newProgress = 0.0;
         if (newProgress > 1) newProgress = 1.0;
-        if (newProgress < 0.000001) newProgress = 0.0;
-        if (newProgress > 0.999999) newProgress = 1.0;
+        if (newProgress < 0.000001 && newProgress > 0)
+          newProgress = 0.0; // 아주 작은 값 보정
+        if (newProgress > 0.999999 && newProgress < 1)
+          newProgress = 1.0; // 거의 1에 가까운 값 보정
       } else {
         newProgress = _remainingTime.inSeconds == 0 ? 1.0 : 0.0;
       }
+    } else if (!_isChallengeRunning && _progressPercent != 0) {
+      // 챌린지가 실행 중이 아닐 때는 현재 진행도를 유지 (0으로 리셋하지 않음)
+      // 단, _progressPercent가 이미 0이 아닌 경우에만 해당
+      newProgress = _progressPercent;
     }
-    // _isChallengeRunning이 false이면 newProgress는 초기값 0.0 유지됨
-    // 또는 명시적으로 설정: else { newProgress = 0.0; }
+    // 챌린지가 아니고, _progressPercent도 0이면 newProgress는 0.0으로 유지됨
+
     setState(() {
       _progressPercent = newProgress;
     });
@@ -328,21 +365,20 @@ class _MyHomePageState extends State<MyHomePage> {
               .round(),
     );
     _updateTimerText();
-    if (mounted) {
-      setState(() {
-        _progressPercent = 0.0;
-      });
-      // _updateProgress(); // 여기서 호출하지 않음
-    }
 
     setState(() {
       _isChallengeRunning = true;
       _beatHighlighter = false;
     });
-    _audioPlayer.setSpeed(
+
+    if (mounted) {
+      _updateProgress();
+    }
+
+    _audioService.setSpeed(
       _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
     );
-    _audioPlayer.play();
+    _audioService.play();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -353,7 +389,7 @@ class _MyHomePageState extends State<MyHomePage> {
       } else {
         _remainingTime = _remainingTime - const Duration(seconds: 1);
         _updateTimerText();
-        _updateProgress(); // 매초 진행도 업데이트
+        _updateProgress();
       }
     });
     _restartBpmTimer();
@@ -368,12 +404,13 @@ class _MyHomePageState extends State<MyHomePage> {
           _progressPercent = 1.0;
           _remainingTime = Duration.zero;
         } else {
-          _updateProgress();
-        } // 중지 시 현재 진행도 반영
+          // 챌린지 중단 시 현재 진행도 유지 (위 _updateProgress에서 처리)
+        }
       });
+      _updateProgress(); // 상태 변경 후 진행도 다시 계산하여 반영
     }
-    _audioPlayer.pause(); // 챌린지 중지/완료 시 음악도 일시정지
-    _bpmTimer?.cancel(); // BPM 타이머도 중지
+    _audioService.pause();
+    _bpmAdjustTimer?.cancel();
     if (mounted) setState(() => _beatHighlighter = false);
     if (completed && mounted) {
       ShadToaster.of(context).show(
@@ -383,32 +420,20 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
     }
-    _updateTimerText(); // 남은 시간 00:00 또는 현재 시간으로 업데이트
+    _updateTimerText();
   }
 
   void _restartBpmTimer() {
-    _bpmTimer?.cancel();
     if (!mounted) return;
     if (_isChallengeRunning || _isPlaying) {
-      final songBpm = _currentManualBpm > 0 ? _currentManualBpm : 60;
-      final beatInterval = (60000 / songBpm).round();
-      if (beatInterval <= 0) {
-        if (mounted) setState(() => _beatHighlighter = false);
-        return;
-      }
-      _bpmTimer = Timer.periodic(Duration(milliseconds: beatInterval), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
-        setState(() {
-          _beatHighlighter = !_beatHighlighter;
-        });
-        // if (_isMetronomeSoundEnabled && (_isChallengeRunning || _isPlaying) && mounted && _metronomePlayer.processingState != ProcessingState.loading) {
-        //   // 메트로놈 오디오 재생 로직 (현재 주석 처리)
-        // }
-      });
+      final songBpm =
+          _currentManualBpm > 0 ? _currentManualBpm : normalBpm; // 기본 BPM 사용
+
+      // AudioService의 startBpmTicker 호출
+      _audioService.startBpmTicker(songBpm);
+      _audioService.setMetronomeSoundEnabled(_isMetronomeSoundEnabled);
     } else {
+      _audioService.stopBpmTicker();
       if (mounted) setState(() => _beatHighlighter = false);
     }
   }
@@ -417,10 +442,13 @@ class _MyHomePageState extends State<MyHomePage> {
     if (!mounted) return;
     setState(() {
       _currentManualBpm = newBpm.clamp(30, 240);
-      final songBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
+      final songOriginalBpm =
+          _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
       _currentPlaybackSpeed =
-          (songBpm == 0) ? 1.0 : (_currentManualBpm / songBpm).clamp(0.5, 2.0);
-      _audioPlayer.setSpeed(
+          (songOriginalBpm == 0)
+              ? 1.0
+              : (_currentManualBpm / songOriginalBpm).clamp(0.5, 2.0);
+      _audioService.setSpeed(
         _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
       );
       if ((_isPlaying && !_isChallengeRunning) || _isChallengeRunning)
@@ -432,13 +460,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       (_currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0))
                   .round(),
         );
-        if (mounted) {
-          setState(() {
-            _progressPercent = 0.0;
-          }); // 진행도 0으로 설정
-        }
+        _progressPercent = 0.0;
         _updateTimerText();
-        // _updateProgress(); // 이미 위에서 0으로 설정 후 UI 업데이트됨
+        _updateProgress();
       }
     });
   }
@@ -482,6 +506,7 @@ class _MyHomePageState extends State<MyHomePage> {
       final intervalMs =
           _tapTimestamps[1].difference(_tapTimestamps[0]).inMilliseconds;
       if (intervalMs > 250 && intervalMs < 2000) {
+        // 유효한 탭 간격 (30 ~ 240 BPM)
         final newBpm = (60000 / intervalMs).round();
         _updateBpmAndPlaybackSpeed(newBpm);
         if (mounted) {
@@ -528,6 +553,45 @@ class _MyHomePageState extends State<MyHomePage> {
     if (mounted) setState(() {});
   }
 
+  void _handlePlaybackCompletion() async {
+    if (!mounted) return;
+
+    switch (_playMode) {
+      case PlayMode.normal:
+        setState(() {
+          _isPlaying = false;
+          _progressPercent = 1.0; // 재생 완료 시 진행도 100%로 설정
+        });
+        _updateProgress(); // UI 업데이트
+        break;
+
+      case PlayMode.repeat:
+        _audioService.seek(Duration.zero);
+        _audioService.play();
+        break;
+
+      case PlayMode.allSongs:
+        _currentSongIndex = (_currentSongIndex + 1) % _songList.length;
+        await _onSongChanged(_songList[_currentSongIndex]);
+        if (mounted && _songList.isNotEmpty) _audioService.play();
+        break;
+
+      case PlayMode.shuffle:
+        if (_songList.length > 1) {
+          int nextIndex;
+          do {
+            nextIndex = _random.nextInt(_songList.length);
+          } while (nextIndex == _currentSongIndex);
+          _currentSongIndex = nextIndex;
+        } else {
+          _currentSongIndex = 0;
+        }
+        await _onSongChanged(_songList[_currentSongIndex]);
+        if (mounted && _songList.isNotEmpty) _audioService.play();
+        break;
+    }
+  }
+
   Future<void> _onSongChanged(Song newSong) async {
     if (_isChallengeRunning && mounted) {
       ShadToaster.of(
@@ -535,7 +599,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ).show(ShadToast(description: const Text('지금은 작업 중이라 노래를 바꿀 수 없어요.')));
       return;
     }
-    if (_isChallengeRunning) _stopChallenge(); // 곡 변경 시 진행 중이던 챌린지 중지
+    if (_isChallengeRunning) _stopChallenge();
 
     if (mounted) {
       setState(() {
@@ -543,10 +607,27 @@ class _MyHomePageState extends State<MyHomePage> {
         _isChallengeRunning = false;
         _progressPercent = 0.0;
       });
+      _updateProgress();
     }
+
+    final int newIndex = _songList.indexWhere(
+      (song) => song.filePath == newSong.filePath,
+    );
+    if (newIndex != -1) {
+      _currentSongIndex = newIndex;
+      print("곡 변경: $_currentSongIndex, ${newSong.title}");
+    } else {
+      print("곡 인덱스를 찾을 수 없음: ${newSong.title}");
+    }
+
+    // 현재 재생 중인 모든 오디오 중지
+    await _audioService.stop();
+    _bpmAdjustTimer?.cancel();
+    if (mounted) setState(() => _beatHighlighter = false);
+
     setState(() {
-      _selectedSong = newSong;
-      _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : 60;
+      _selectedSong = newSong; // 직접 새 곡을 사용 (인덱스로부터 찾지 않음)
+      _currentManualBpm = _selectedSong.bpm > 0 ? _selectedSong.bpm : normalBpm;
       _currentPlaybackSpeed = 1.0;
       _isPlaying = false;
       _remainingTime = Duration.zero;
@@ -554,10 +635,32 @@ class _MyHomePageState extends State<MyHomePage> {
       _audioDuration = null;
       _beatHighlighter = false;
     });
-    await _audioPlayer.stop();
-    _bpmTimer?.cancel();
-    if (mounted) setState(() => _beatHighlighter = false);
-    await _initAudioPlayers();
+
+    await _initAudioService();
+  }
+
+  void _changePlayMode(PlayMode newMode) {
+    setState(() {
+      _playMode = newMode;
+    });
+    String modeMessage;
+    switch (newMode) {
+      case PlayMode.normal:
+        modeMessage = '일반 재생 모드로 변경되었습니다.';
+        break;
+      case PlayMode.repeat:
+        modeMessage = '한 곡 반복 모드로 변경되었습니다.';
+        break;
+      case PlayMode.allSongs:
+        modeMessage = '전체 곡 순차 재생 모드로 변경되었습니다.';
+        break;
+      case PlayMode.shuffle:
+        modeMessage = '랜덤 재생 모드로 변경되었습니다.';
+        break;
+    }
+    if (mounted) {
+      ShadToaster.of(context).show(ShadToast(description: Text(modeMessage)));
+    }
   }
 
   void _startBpmAdjustTimer(int delta) {
@@ -584,70 +687,59 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_isChallengeRunning) return; // 챌린지 중에는 독립 제어 불가
 
     if (_isPlaying) {
-      _audioPlayer.pause();
+      _audioService.pause();
     } else {
-      _audioPlayer.setSpeed(
+      _audioService.setSpeed(
         _currentPlaybackSpeed > 0 ? _currentPlaybackSpeed : 1.0,
       );
-      _audioPlayer.play();
+      _audioService.play();
       // _isChallengeRunning이 false일 때만 _restartBpmTimer 호출 (음악만 독립 재생 시)
       if (!_isChallengeRunning) _restartBpmTimer();
     }
-    // _isPlaying 상태는 _audioPlayer.playingStream.listen 에 의해 업데이트됨
+    // _isPlaying 상태는 _audioService.onPlayingStateChanged 에 의해 업데이트됨
   }
 
   void _handleStop() {
     if (_isLoadingSong || _audioDuration == null) return;
     if (_isChallengeRunning) return; // 챌린지 중에는 독립 제어 불가
 
-    _audioPlayer.stop();
-    _audioPlayer.seek(Duration.zero); // 정지 시 처음으로
+    _audioService.stop();
+    _audioService.seek(Duration.zero); // 정지 시 처음으로
     // 음악 정지 시 BPM 타이머도 중지 (챌린지 중이 아닐 때)
     if (!_isChallengeRunning) {
-      _bpmTimer?.cancel();
+      _bpmAdjustTimer?.cancel();
       if (mounted) setState(() => _beatHighlighter = false);
     }
-    // _isPlaying 상태는 _audioPlayer.playingStream.listen 에 의해 업데이트됨
+    // _isPlaying 상태는 _audioService.onPlayingStateChanged 에 의해 업데이트됨
   }
 
-  Future<void> _showMetronomeSettingsDialog() async {
-    final theme = ShadTheme.of(context);
+  Future<void> _showPlaylistDialog() async {
     return showShadDialog<void>(
       context: context,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return ShadDialog(
-              title: const Text('메트로놈 설정'),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    Text('메트로놈 소리 켜기', style: theme.textTheme.p),
-                    ShadSwitch(
-                      value: _isMetronomeSoundEnabled,
-                      onChanged: (bool value) {
-                        setDialogState(() {
-                          _isMetronomeSoundEnabled = value;
-                        });
-                        setState(() {
-                          _isMetronomeSoundEnabled = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: <Widget>[
-                ShadButton.ghost(
-                  child: const Text('닫기'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
+        return PlaylistDialogWidget(
+          songList: _songList,
+          selectedSong: _selectedSong,
+          currentPlayMode: _playMode,
+          onPlayModeChanged: _changePlayMode,
+          onSongSelected: _onSongChanged,
+        );
+      },
+    );
+  }
+
+  Future<void> _showMetronomeSettingsDialog() async {
+    return showShadDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return MetronomeSettingsDialogWidget(
+          initialMetronomeSoundEnabled: _isMetronomeSoundEnabled,
+          onMetronomeSoundChanged: (value) {
+            if (mounted) {
+              setState(() {
+                _isMetronomeSoundEnabled = value;
+              });
+            }
           },
         );
       },
@@ -680,9 +772,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     ? theme.colorScheme.primary
                     : theme.colorScheme.foreground));
 
-    final canInteractWithSettings = !_isChallengeRunning && !_isLoadingSong;
-    // final canControlMusicIndependent = !_isChallengeRunning && !_isLoadingSong && _audioDuration != null; // MusicControlWidget 내부에서 계산하도록 변경
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: theme.colorScheme.primary,
@@ -696,14 +785,20 @@ class _MyHomePageState extends State<MyHomePage> {
         actions: [
           ShadButton.ghost(
             icon: Icon(
+              Icons.queue_music,
+              color: theme.colorScheme.primaryForeground,
+            ),
+            onPressed: _showPlaylistDialog,
+          ),
+          ShadButton.ghost(
+            icon: Icon(
               Icons.music_note_outlined,
               color: theme.colorScheme.primaryForeground,
             ),
-            onPressed: _showMetronomeSettingsDialog, // 설정 다이얼로그 호출
+            onPressed: _showMetronomeSettingsDialog,
           ),
-          // 라이트/다크 모드 전환 버튼 추가
           ValueListenableBuilder<ThemeMode>(
-            valueListenable: themeModeNotifier, // my_app.dart에 정의된 notifier
+            valueListenable: themeModeNotifier,
             builder: (context, currentMode, child) {
               return ShadButton.ghost(
                 icon: Icon(
@@ -718,8 +813,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ? ThemeMode.dark
                           : currentMode == ThemeMode.dark
                           ? ThemeMode.system
-                          : ThemeMode
-                              .light; // Light -> Dark -> System -> Light 순환
+                          : ThemeMode.light;
                 },
               );
             },
@@ -730,132 +824,65 @@ class _MyHomePageState extends State<MyHomePage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: LayoutBuilder(
+            // 반응형 처리를 위해 LayoutBuilder 유지
             builder: (context, constraints) {
-              final screenWidth = MediaQuery.of(context).size.width;
-              final horizontalPadding = screenWidth < 600 ? 16.0 : 24.0;
-              return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: horizontalPadding,
-                  vertical: 24.0,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    if (_isLoadingSong)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    if (!_isChallengeRunning && !_isLoadingSong)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 24.0),
-                        child: ShadSelect<Song>(
-                          placeholder: Text(
-                            '노동요를 선택하세요',
-                            style: theme.textTheme.p.copyWith(
-                              color: theme.colorScheme.mutedForeground,
+              // 가로 패딩은 여기서 계산
+              final horizontalPadding =
+                  constraints.maxWidth < 600 ? 16.0 : 24.0;
+              return Padding(
+                // HomeContentWidget을 Padding으로 감싸서 horizontalPadding 적용
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: HomeContentWidget(
+                  isLoadingSong: _isLoadingSong,
+                  isChallengeRunning: _isChallengeRunning,
+                  selectedSong: _selectedSong,
+                  songList: _songList,
+                  onSongChanged: (Song? value) {
+                    if (value != null) _onSongChanged(value);
+                  },
+                  timerText: _timerText,
+                  defaultBorderRadius: defaultBorderRadius,
+                  beatHighlighter: _beatHighlighter,
+                  bpmChangedByTap: _bpmChangedByTap,
+                  bpmIndicatorScale: bpmIndicatorScale,
+                  bpmIndicatorColor: bpmIndicatorColor,
+                  bpmTextColor: bpmTextColor,
+                  tapTimestamps: _tapTimestamps,
+                  currentManualBpm: _currentManualBpm,
+                  onChangeBpmToPreset: _changeBpmToPreset,
+                  onChangeBpm: _changeBpm,
+                  onStartBpmAdjustTimer: _startBpmAdjustTimer,
+                  onStopBpmAdjustTimer: _stopBpmAdjustTimer,
+                  onHandleTapForBpm: _handleTapForBpm,
+                  progressPercent: _progressPercent,
+                  isPlaying: _isPlaying,
+                  audioDuration: _audioDuration,
+                  currentPlaybackSpeed: _currentPlaybackSpeed,
+                  onPlayPause: _handlePlayPause,
+                  onStop: _handleStop,
+                  onChallengeButtonPressed: () {
+                    if (_isChallengeRunning) {
+                      _stopChallenge();
+                    } else {
+                      if (_audioDuration == null) {
+                        if (mounted) {
+                          ShadToaster.of(context).show(
+                            ShadToast(
+                              title: const Text('오류'),
+                              description: const Text('음악 정보를 로드 중입니다.'),
                             ),
-                          ),
-                          options:
-                              _songList
-                                  .map(
-                                    (song) => ShadOption(
-                                      value: song,
-                                      child: Text(
-                                        song.title,
-                                        style: theme.textTheme.p,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                          selectedOptionBuilder:
-                              (context, value) =>
-                                  Text(value.title, style: theme.textTheme.p),
-                          onChanged:
-                              canInteractWithSettings
-                                  ? (Song? value) {
-                                    if (value != null) _onSongChanged(value);
-                                  }
-                                  : null,
-                          initialValue: _selectedSong,
-                        ),
-                      ),
-                    TimerDisplayWidget(
-                      isLoadingSong: _isLoadingSong,
-                      timerText: _timerText,
-                      borderRadius: defaultBorderRadius,
-                    ),
-                    const SizedBox(height: 12),
-                    Visibility(
-                      visible: canInteractWithSettings,
-                      child: BpmControlSectionWidget(
-                        isLoadingSong: _isLoadingSong,
-                        isChallengeRunning: _isChallengeRunning,
-                        currentManualBpm: _currentManualBpm,
-                        beatHighlighter: _beatHighlighter,
-                        bpmChangedByTap: _bpmChangedByTap,
-                        bpmIndicatorScale: bpmIndicatorScale,
-                        bpmIndicatorColor: bpmIndicatorColor,
-                        bpmTextColor: bpmTextColor,
-                        defaultBorderRadius: defaultBorderRadius,
-                        tapTimestamps: _tapTimestamps,
-                        onChangeBpmToPreset: _changeBpmToPreset,
-                        onChangeBpm: _changeBpm,
-                        onStartBpmAdjustTimer: _startBpmAdjustTimer,
-                        onStopBpmAdjustTimer: _stopBpmAdjustTimer,
-                        onHandleTapForBpm: _handleTapForBpm,
-                        slowBpm: slowBpm,
-                        normalBpm: normalBpm,
-                        fastBpm: fastBpm,
-                      ),
-                    ),
-                    if (canInteractWithSettings)
-                      const SizedBox(height: 24)
-                    else
-                      const SizedBox(height: 12),
-                    ProgressDisplayWidget(
-                      isLoadingSong: _isLoadingSong,
-                      isChallengeRunning: _isChallengeRunning,
-                      progressPercent: _progressPercent,
-                    ),
-                    const SizedBox(height: 30),
-                    MusicControlWidget(
-                      isLoadingSong: _isLoadingSong,
-                      isChallengeRunning: _isChallengeRunning,
-                      isPlaying: _isPlaying,
-                      selectedSong: _selectedSong,
-                      audioDuration: _audioDuration,
-                      currentPlaybackSpeed: _currentPlaybackSpeed,
-                      currentManualBpm: _currentManualBpm,
-                      defaultBorderRadius: defaultBorderRadius,
-                      onPlayPause: _handlePlayPause,
-                      onStop: _handleStop,
-                    ),
-                    const SizedBox(height: 30),
-                    ChallengeControlButtonWidget(
-                      isLoadingSong: _isLoadingSong,
-                      isChallengeRunning: _isChallengeRunning,
-                      onPressed: () {
-                        if (_isChallengeRunning) {
-                          _stopChallenge();
-                        } else {
-                          if (_audioDuration == null) {
-                            if (mounted) {
-                              ShadToaster.of(context).show(
-                                ShadToast(
-                                  title: const Text('오류'),
-                                  description: const Text('음악 정보를 로드 중입니다.'),
-                                ),
-                              );
-                            }
-                            return;
-                          }
-                          _startChallenge();
+                          );
                         }
-                      },
-                    ),
-                  ],
+                        return;
+                      }
+                      _startChallenge();
+                    }
+                  },
+                  slowBpm: slowBpm,
+                  normalBpm: normalBpm,
+                  fastBpm: fastBpm,
+                  playMode: _playMode,
+                  onPlayModeChanged: _changePlayMode,
                 ),
               );
             },
