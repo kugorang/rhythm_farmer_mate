@@ -608,11 +608,21 @@ class _MyHomePageState extends State<MyHomePage> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    ShadProgress(
-                      value: _isLoadingSong ? 0 : _progressPercent * 100,
-                      minHeight: 12,
-                      color: theme.colorScheme.primary,
-                      backgroundColor: theme.colorScheme.muted,
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      tween: Tween<double>(
+                        begin: 0,
+                        end: _isLoadingSong ? 0 : _progressPercent * 100,
+                      ),
+                      builder: (context, value, child) {
+                        return ShadProgress(
+                          value: value,
+                          minHeight: 12,
+                          color: theme.colorScheme.primary,
+                          backgroundColor: theme.colorScheme.muted,
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
                     Center(
