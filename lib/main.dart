@@ -539,12 +539,15 @@ class _MyHomePageState extends State<MyHomePage> {
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        ShadButton.outline(
-                          child: const Icon(
-                            Icons.remove_circle_outline,
-                            size: 16,
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline),
+                          iconSize: 28,
+                          color: theme.colorScheme.foreground,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          splashRadius: 24,
                           onPressed:
                               _isTimerRunning ||
                                       _isLoadingSong ||
@@ -595,8 +598,13 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                           ),
                         ),
-                        ShadButton.outline(
-                          child: const Icon(Icons.add_circle_outline, size: 16),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline),
+                          iconSize: 28,
+                          color: theme.colorScheme.foreground,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          splashRadius: 24,
                           onPressed:
                               _isTimerRunning ||
                                       _isLoadingSong ||
