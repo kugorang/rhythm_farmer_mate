@@ -214,183 +214,198 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0), // 전체 패딩 증가
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.symmetric(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              final horizontalPadding = screenWidth < 600 ? 24.0 : 48.0;
+              return Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
                   vertical: 24.0,
-                  horizontal: 16.0,
-                ), // 타이머 영역 패딩 조정
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(12.0), // 모서리 둥글게
-                ),
-                child: Center(
-                  child: Text(
-                    _timerText,
-                    style: const TextStyle(
-                      fontSize: 60,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ), // 타이머 폰트 크기 및 색상 조정
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              Container(
-                height: 60, // BPM 표시기 높이 증가
-                decoration: BoxDecoration(
-                  color:
-                      _beatHighlighter
-                          ? Colors.amberAccent.shade100
-                          : Colors.grey.shade200, // 색상 부드럽게
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: Center(
-                  child: Text(
-                    'BPM: $_currentBpm',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ), // BPM 텍스트 스타일 조정
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              LinearProgressIndicator(
-                value: _progressPercent,
-                minHeight: 25, // 진행 바 높이 증가
-                backgroundColor: Colors.grey.shade300,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Colors.green.shade600,
-                ),
-                borderRadius: BorderRadius.circular(12.5), // 진행 바 모서리 둥글게
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  '진행도: ${(_progressPercent * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w500,
-                  ), // 진행도 텍스트 스타일 조정
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: Column(
-                  children: [
-                    Text(
-                      '현재 재생 중: $_currentSongTitle',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18, // 곡 제목 폰트 크기 증가
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 24.0,
+                        horizontal: 16.0,
+                      ), // 타이머 영역 패딩 조정
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12.0), // 모서리 둥글게
+                      ),
+                      child: Center(
+                        child: Text(
+                          _timerText,
+                          style: const TextStyle(
+                            fontSize: 60,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ), // 타이머 폰트 크기 및 색상 조정
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // 재생/일시정지 버튼은 타이머와 오디오 상태에 따라 아이콘이 변경되므로 항상 활성화된 것처럼 보임
-                        IconButton(
-                          icon: Icon(
-                            _isPlaying
-                                ? Icons.pause_circle_filled
-                                : Icons.play_circle_filled,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                          iconSize: 60, // 아이콘 크기 증가
-                          onPressed: () {
-                            if (_audioDuration == null)
-                              return; // 오디오 로드 전에는 동작 안함
-                            if (_isPlaying) {
-                              _audioPlayer.pause();
-                            } else {
-                              _audioPlayer.play();
-                            }
-                          },
+                    const SizedBox(height: 24),
+
+                    Container(
+                      height: 60, // BPM 표시기 높이 증가
+                      decoration: BoxDecoration(
+                        color:
+                            _beatHighlighter
+                                ? Colors.amberAccent.shade100
+                                : Colors.grey.shade200, // 색상 부드럽게
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'BPM: $_currentBpm',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ), // BPM 텍스트 스타일 조정
                         ),
-                        // 정지 버튼 역시 타이머와 오디오 상태와 직접 연동 (타이머 비실행 중에도 누를 수 있도록)
-                        IconButton(
-                          icon: Icon(
-                            Icons.stop_circle_outlined,
-                            color: Colors.red.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    LinearProgressIndicator(
+                      value: _progressPercent,
+                      minHeight: 25, // 진행 바 높이 증가
+                      backgroundColor: Colors.grey.shade300,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.green.shade600,
+                      ),
+                      borderRadius: BorderRadius.circular(12.5), // 진행 바 모서리 둥글게
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        '진행도: ${(_progressPercent * 100).toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ), // 진행도 텍스트 스타일 조정
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    Container(
+                      padding: const EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '현재 재생 중: $_currentSongTitle',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 18, // 곡 제목 폰트 크기 증가
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
-                          iconSize: 60, // 아이콘 크기 증가
-                          onPressed: () {
-                            if (_audioDuration == null)
-                              return; // 오디오 로드 전에는 동작 안함
-                            _audioPlayer.stop();
-                            _audioPlayer.seek(Duration.zero);
-                            // 만약 타이머가 실행 중이었다면, 타이머도 함께 정지 (선택적, 현재는 타이머는 별도 제어)
-                            // if (_isTimerRunning) {
-                            //   _stopTimer();
-                            // }
-                          },
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // 재생/일시정지 버튼은 타이머와 오디오 상태에 따라 아이콘이 변경되므로 항상 활성화된 것처럼 보임
+                              IconButton(
+                                icon: Icon(
+                                  _isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_filled,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                                iconSize: 60, // 아이콘 크기 증가
+                                onPressed: () {
+                                  if (_audioDuration == null)
+                                    return; // 오디오 로드 전에는 동작 안함
+                                  if (_isPlaying) {
+                                    _audioPlayer.pause();
+                                  } else {
+                                    _audioPlayer.play();
+                                  }
+                                },
+                              ),
+                              // 정지 버튼 역시 타이머와 오디오 상태와 직접 연동 (타이머 비실행 중에도 누를 수 있도록)
+                              IconButton(
+                                icon: Icon(
+                                  Icons.stop_circle_outlined,
+                                  color: Colors.red.shade700,
+                                ),
+                                iconSize: 60, // 아이콘 크기 증가
+                                onPressed: () {
+                                  if (_audioDuration == null)
+                                    return; // 오디오 로드 전에는 동작 안함
+                                  _audioPlayer.stop();
+                                  _audioPlayer.seek(Duration.zero);
+                                  // 만약 타이머가 실행 중이었다면, 타이머도 함께 정지 (선택적, 현재는 타이머는 별도 제어)
+                                  // if (_isTimerRunning) {
+                                  //   _stopTimer();
+                                  // }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 20.0,
+                        ), // 버튼 내부 패딩 증가
+                        backgroundColor:
+                            _isTimerRunning
+                                ? Colors.red.shade400
+                                : Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white, // 텍스트 색상 명시
+                        textStyle: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ), // 버튼 텍스트 스타일 조정
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ), // 버튼 모서리 둥글게
+                      ),
+                      onPressed: () {
+                        if (_isTimerRunning) {
+                          _stopTimer();
+                        } else {
+                          if (_audioDuration != null &&
+                              (_remainingTime.inSeconds == 0 ||
+                                  _remainingTime != _audioDuration)) {
+                            setState(() {
+                              _remainingTime = _audioDuration!;
+                              _progressPercent = 0.0;
+                              _updateTimerText();
+                            });
+                          }
+                          _startTimer();
+                        }
+                      },
+                      child: Text(
+                        _isTimerRunning ? '작업 중지' : '작업 시작',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          color: Colors.white,
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 30),
-
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                  ), // 버튼 내부 패딩 증가
-                  backgroundColor:
-                      _isTimerRunning
-                          ? Colors.red.shade400
-                          : Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white, // 텍스트 색상 명시
-                  textStyle: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ), // 버튼 텍스트 스타일 조정
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                  ), // 버튼 모서리 둥글게
-                ),
-                onPressed: () {
-                  if (_isTimerRunning) {
-                    _stopTimer();
-                  } else {
-                    if (_audioDuration != null &&
-                        (_remainingTime.inSeconds == 0 ||
-                            _remainingTime != _audioDuration)) {
-                      setState(() {
-                        _remainingTime = _audioDuration!;
-                        _progressPercent = 0.0;
-                        _updateTimerText();
-                      });
-                    }
-                    _startTimer();
-                  }
-                },
-                child: Text(
-                  _isTimerRunning ? '작업 중지' : '작업 시작',
-                  style: const TextStyle(fontSize: 20, color: Colors.white),
-                ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
