@@ -694,21 +694,28 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                               ),
                             ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              IconButton(
-                                icon: Icon(
-                                  _isPlaying
-                                      ? Icons.pause_circle
-                                      : Icons.play_circle_outline,
-                                  color: theme.colorScheme.primary,
-                                  size: 52,
+                              ShadButton.ghost(
+                                icon: Padding(
+                                  padding: const EdgeInsets.only(right: 4.0),
+                                  child: Icon(
+                                    _isPlaying
+                                        ? Icons.pause_circle_outline
+                                        : Icons.play_circle_outline,
+                                    size: 24,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                 ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                splashRadius: 30,
+                                child: Text(
+                                  _isPlaying ? '일시정지' : '재생',
+                                  style: theme.textTheme.p.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                                 onPressed:
                                     _isLoadingSong || _audioDuration == null
                                         ? null
@@ -727,13 +734,22 @@ class _MyHomePageState extends State<MyHomePage> {
                                           }
                                         },
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.stop_circle_outlined),
-                                iconSize: 52,
-                                color: theme.colorScheme.destructive,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                splashRadius: 30,
+                              ShadButton.ghost(
+                                icon: Padding(
+                                  padding: const EdgeInsets.only(right: 4.0),
+                                  child: Icon(
+                                    Icons.stop_circle,
+                                    size: 24,
+                                    color: theme.colorScheme.destructive,
+                                  ),
+                                ),
+                                child: Text(
+                                  '정지',
+                                  style: theme.textTheme.p.copyWith(
+                                    color: theme.colorScheme.destructive,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                                 onPressed:
                                     _isLoadingSong || _audioDuration == null
                                         ? null
@@ -750,6 +766,19 @@ class _MyHomePageState extends State<MyHomePage> {
                     const SizedBox(height: 30),
                     ShadButton(
                       size: ShadButtonSize.lg,
+                      icon: Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Icon(
+                          _isTimerRunning
+                              ? Icons.stop_rounded
+                              : Icons.play_arrow_rounded,
+                          size: (theme.textTheme.large.fontSize ?? 18) * 1.1,
+                          color:
+                              _isTimerRunning
+                                  ? theme.colorScheme.destructiveForeground
+                                  : theme.colorScheme.primaryForeground,
+                        ),
+                      ),
                       child: Text(
                         _isLoadingSong
                             ? '노래 로딩 중...'
